@@ -10,11 +10,14 @@ final class HtmlMailSender {
     private HtmlMailSender() {
     }
 
-    static void sendHtmlMail(JavaMailSender mailSender,
-                             String fromAddress,
-                             String toEmail,
-                             String subject,
-                             String html) {
+    static void sendHtmlMail(
+            JavaMailSender mailSender,
+            String fromAddress,
+            String toEmail,
+            String subject,
+            String html
+    )
+    {
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
