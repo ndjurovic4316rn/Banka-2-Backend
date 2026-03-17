@@ -4,6 +4,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import org.hibernate.validator.constraints.Length;
 
 import java.math.BigDecimal;
 
@@ -11,9 +12,11 @@ import java.math.BigDecimal;
 public class CreatePaymentRequestDto {
 
     @NotBlank(message = "Source account is required")
+    @Length(min = 10, max = 20, message = "Account number must be between 10 and 20 characters")
     private String fromAccount;
 
     @NotBlank(message = "Destination account is required")
+    @Length(min = 10, max = 20, message = "Account number must be between 10 and 20 characters")
     private String toAccount;
 
     @NotNull(message = "Amount is required")

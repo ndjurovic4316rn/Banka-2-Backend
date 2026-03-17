@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import rs.raf.banka2_bek.account.model.Account;
+import rs.raf.banka2_bek.auth.model.User;
 import rs.raf.banka2_bek.currency.model.Currency;
 import rs.raf.banka2_bek.client.model.Client;
 
@@ -11,8 +12,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "payments")
-@Getter
+@Table(name = "payments", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_payments_order_number", columnNames = "order_number")
+})@Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
@@ -59,7 +61,8 @@ public class Payment {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_id", nullable = false)
-    private Client createdBy;
+//    private Client createdBy;
+    private User createdBy;              // Korisnik koji je kreirao nalog (može biti klijent ili zaposleni)
 
     @Column(nullable = false, updatable = false)
     @Builder.Default
