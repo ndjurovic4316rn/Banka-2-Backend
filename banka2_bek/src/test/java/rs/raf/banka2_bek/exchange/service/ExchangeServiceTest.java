@@ -1,4 +1,4 @@
-
+package rs.raf.banka2_bek.exchange.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import rs.raf.banka2_bek.exchange.ExchangeService;
+import rs.raf.banka2_bek.exchange.dto.CalculateExchangeResponseDto;
 import rs.raf.banka2_bek.exchange.dto.ExchangeRateDto;
 
 import java.util.HashMap;
@@ -33,6 +34,27 @@ class ExchangeServiceTest {
         ReflectionTestUtils.setField(exchangeService, "apiKey", "test-key");
         ReflectionTestUtils.setField(exchangeService, "apiUrl", "https://data.fixer.io/api/latest");
     }
+    private void mockRates() {
+        Map<String, Object> rates = new HashMap<>();
+        rates.put("RSD", 117.35);
+        rates.put("EUR", 1.0);
+        rates.put("USD", 1.15);
+        rates.put("CHF", 0.91);
+        rates.put("GBP", 0.87);
+        rates.put("JPY", 183.02);
+        rates.put("CAD", 1.58);
+        rates.put("AUD", 1.65);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("rates", rates);
+
+        String expectedUrl =
+                "https://data.fixer.io/api/latest?access_key=test-key&symbols=RSD,EUR,CHF,USD,GBP,JPY,CAD,AUD";
+
+        when(restTemplate.getForEntity(expectedUrl, Map.class))
+                .thenReturn(ResponseEntity.ok(body));
+    }
+
 
     @Test
     void shouldReturnAllExchangeRates() {
@@ -135,5 +157,106 @@ class ExchangeServiceTest {
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
+    }
+
+    //======================================
+    @Test
+    void calculate_rsdToRsd_returnsSameAmount() {
+        CalculateExchangeResponseDto result = exchangeService.calculate(100.0,"RSD");
+        assertEquals(100.0, result.getConvertedAmount());
+        assertEquals(1.0, result.getExchangeRate());
+    }
+
+    @Test
+    void calculate_rsdToEur_appliesSellRateAndCommission() {
+        mockRates();
+        // eurRate = 1/117.35 = 0.008522
+        // sellRate = 0.008522 * 1.02 = 0.008692
+        // converted = 1000 * 0.008692 * 0.995
+        double eurRate = 1.0 / 117.35;
+        double sellRate = eurRate * 1.02;
+        double expected = Math.round((1000.0 * sellRate * 0.995) * 10000.0) / 10000.0;
+
+        CalculateExchangeResponseDto result = exchangeService.calculate(1000.0, "EUR");
+
+        assertEquals(expected, result.getConvertedAmount(), 0.0001);
+    }
+
+    @Test
+    void calculate_rsdToUsd_appliesSellRateAndCommission() {
+        mockRates();
+        double usdRate = 1.15 / 117.35;
+        double sellRate = usdRate * 1.02;
+        double expected = Math.round((500.0 * sellRate * 0.995) * 10000.0) / 10000.0;
+
+        CalculateExchangeResponseDto result = exchangeService.calculate(500.0, "USD");
+
+        assertEquals(expected, result.getConvertedAmount(), 0.0001);
+    }
+
+    @Test
+    void calculate_unsupportedCurrency_throwsException() {
+        mockRates();
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> exchangeService.calculate(100.0, "XYZ"));
+        assertEquals("Currency not supported: XYZ", ex.getMessage());
+    }
+
+// ===================== calculateCross =====================
+
+    @Test
+    void calculateCross_fromRsd_delegatesToCalculate() {
+        mockRates();
+        CalculateExchangeResponseDto result = exchangeService.calculateCross(1000.0, "RSD", "EUR");
+        assertEquals("RSD", result.getFromCurrency());
+        assertEquals("EUR", result.getToCurrency());
+        assertTrue(result.getConvertedAmount() > 0);
+    }
+
+    // ovaj opet
+    @Test
+    void calculateCross_eurToRsd_returnsCorrectAmount() {
+        mockRates();
+
+
+        double eurRate = Math.round((1.0 / 117.35) * 1_000_000.0) / 1_000_000.0;
+
+
+        double sellRate = Math.round((1.0 / eurRate) * 1.02 * 1_000_000.0) / 1_000_000.0;
+
+        double commission = 0.005;
+        double expected = Math.round((100.0 * sellRate * (1 - commission)) * 10000.0) / 10000.0;
+
+        CalculateExchangeResponseDto result = exchangeService.calculateCross(100.0, "EUR", "RSD");
+
+        assertEquals(expected, result.getConvertedAmount(), 0.0001);
+        assertEquals("EUR", result.getFromCurrency());
+        assertEquals("RSD", result.getToCurrency());
+    }
+
+    @Test
+    void calculateCross_eurToUsd_goesThroughRsd() {
+        mockRates();
+        CalculateExchangeResponseDto result = exchangeService.calculateCross(100.0, "EUR", "USD");
+        System.out.println(result.getConvertedAmount());
+        assertEquals("EUR", result.getFromCurrency());
+        assertEquals("USD", result.getToCurrency());
+
+        assertTrue(result.getConvertedAmount() > 90.0);
+        assertTrue(result.getConvertedAmount() < 120.0);
+    }
+
+    @Test
+    void calculateCross_fromUnsupportedCurrency_throwsException() {
+        mockRates();
+        assertThrows(RuntimeException.class,
+                () -> exchangeService.calculateCross(100.0, "XYZ", "EUR"));
+    }
+
+    @Test
+    void calculateCross_toUnsupportedCurrency_throwsException() {
+        mockRates();
+        assertThrows(RuntimeException.class,
+                () -> exchangeService.calculateCross(100.0, "EUR", "XYZ"));
     }
 }

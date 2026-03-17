@@ -12,6 +12,7 @@ import rs.raf.banka2_bek.account.model.Account;
 import rs.raf.banka2_bek.currency.model.Currency;
 import rs.raf.banka2_bek.client.model.Client;
 import rs.raf.banka2_bek.payment.model.PaymentStatus;
+import rs.raf.banka2_bek.payment.model.PaymentRecipient;
 
 @Entity
 @Table(name = "clients", uniqueConstraints = {

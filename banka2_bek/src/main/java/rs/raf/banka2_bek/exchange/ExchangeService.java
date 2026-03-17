@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import rs.raf.banka2_bek.exchange.dto.CalculateExchangeResponseDto;
 import rs.raf.banka2_bek.exchange.dto.ExchangeRateDto;
 
 import java.util.ArrayList;
@@ -84,4 +85,73 @@ public class ExchangeService {
         double factor = Math.pow(10, places);
         return Math.round(value * factor) / factor;
     }
+
+
+    public CalculateExchangeResponseDto calculate(double amount, String toCurrency) {
+
+        if ("RSD".equalsIgnoreCase(toCurrency)) {
+            return new CalculateExchangeResponseDto(amount, 1.0, "RSD", "RSD");
+        }
+
+        List<ExchangeRateDto> rates = getAllRates();
+
+        double rsdToTarget = rates.stream()
+                .filter(r -> r.getCurrency().equalsIgnoreCase(toCurrency))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Currency not supported: " + toCurrency))
+                .getRate();
+
+        // Prodajni kurs = +2% na srednji kurs (banka prodaje valutu klijentu)
+        double sellRate = round(rsdToTarget * 1.02, 6);
+
+        // Provizija 0.5%
+        double commission = 0.005;
+
+        double convertedAmount = round((amount * sellRate) * (1 - commission), 4);
+
+        return new CalculateExchangeResponseDto(convertedAmount, sellRate, "RSD", toCurrency.toUpperCase());
+    }
+
+
+    private double[] convertToRsd(double amount, String fromCurrency, List<ExchangeRateDto> rates) {
+        double rsdToFrom = rates.stream()
+                .filter(r -> r.getCurrency().equalsIgnoreCase(fromCurrency))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Currency not supported: " + fromCurrency))
+                .getRate();
+
+        double sellRate = round((1.0 / rsdToFrom) * 1.02, 6);
+        double commission = 0.005;
+        double rsdAmount = round((amount * sellRate) * (1 - commission), 4);
+
+        return new double[]{rsdAmount, sellRate};
+    }
+
+    public CalculateExchangeResponseDto calculateCross(double amount, String fromCurrency, String toCurrency) {
+
+        if ("RSD".equalsIgnoreCase(fromCurrency)) {
+            return calculate(amount, toCurrency);
+        }
+
+        List<ExchangeRateDto> rates = getAllRates();
+        double[] conversion = convertToRsd(amount, fromCurrency, rates);
+        double rsdAmount = conversion[0];
+        double sellRate = conversion[1];
+
+        if ("RSD".equalsIgnoreCase(toCurrency)) {
+            return new CalculateExchangeResponseDto(rsdAmount, sellRate, fromCurrency.toUpperCase(), "RSD");
+        }
+
+        CalculateExchangeResponseDto step2 = calculate(rsdAmount, toCurrency);
+        double crossRate = round(step2.getConvertedAmount() / amount, 6);
+
+        return new CalculateExchangeResponseDto(
+                step2.getConvertedAmount(),
+                crossRate,
+                fromCurrency.toUpperCase(),
+                toCurrency.toUpperCase()
+        );
+    }
+
+
 }
