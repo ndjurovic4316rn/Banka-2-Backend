@@ -42,7 +42,9 @@ public class GlobalSecurityConfig  {
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/v3/api-docs"
+                                "/v3/api-docs",
+                                "/exchange-rates",
+                                "/exchange/calculate"
                         ).permitAll()
                         .requestMatchers("/employees/**").hasRole("ADMIN")
                         .requestMatchers("/payment-recipients/**").hasRole("CLIENT")
