@@ -95,7 +95,7 @@ public class AuthService {
                 return new AuthResponseDto(accessToken, refreshToken);
             }
         }
-        
+
         // Neither employee nor user found, or password didn't match
         throw new RuntimeException("Invalid email or password");
     }

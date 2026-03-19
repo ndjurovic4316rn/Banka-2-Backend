@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -17,6 +18,7 @@ import rs.raf.banka2_bek.employee.model.ActivationToken;
 import rs.raf.banka2_bek.employee.model.Employee;
 import rs.raf.banka2_bek.employee.repository.ActivationTokenRepository;
 import rs.raf.banka2_bek.employee.repository.EmployeeRepository;
+import rs.raf.banka2_bek.notification.service.MailNotificationService;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -30,6 +32,9 @@ import static org.springframework.http.HttpStatus.OK;
 class EmployeeAuthControllerIntegrationTest {
 
         private final RestTemplate restTemplate = new RestTemplate();
+
+    @MockitoBean
+    private MailNotificationService mailNotificationService;
 
         @Value("${local.server.port}")
         private int port;

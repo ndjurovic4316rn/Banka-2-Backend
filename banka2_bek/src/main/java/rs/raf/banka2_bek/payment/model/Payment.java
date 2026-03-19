@@ -4,15 +4,17 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import rs.raf.banka2_bek.account.model.Account;
-import rs.raf.banka2_bek.currency.model.Currency;
+import rs.raf.banka2_bek.auth.model.User;
 import rs.raf.banka2_bek.client.model.Client;
+import rs.raf.banka2_bek.currency.model.Currency;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "payments")
-@Getter
+@Table(name = "payments", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_payments_order_number", columnNames = "order_number")
+})@Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
@@ -35,6 +37,9 @@ public class Payment {
 
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal amount;
+
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal fee = BigDecimal.ZERO;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "currency_id", nullable = false)
@@ -61,6 +66,7 @@ public class Payment {
     @JoinColumn(name = "created_by_id", nullable = false)
     private Client createdBy;
 
+    //trenutno UTC zbog docker env-a ili tako nesto
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

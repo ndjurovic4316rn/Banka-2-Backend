@@ -20,16 +20,16 @@ public class PaymentRecipient {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Korisnik čija je ovo lista omiljenih primaoca
+    // Client who owns this list of saved payment recipients
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
 
     @Column(nullable = false, length = 100)
-    private String name;            // Naziv / ime i prezime primaoca
+    private String name;            // Recipient name or full name
 
     @Column(nullable = false, length = 18)
-    private String accountNumber;   // Broj računa primaoca
+    private String accountNumber;   // Recipient account number
 
     @Column(nullable = false, updatable = false)
     @Builder.Default

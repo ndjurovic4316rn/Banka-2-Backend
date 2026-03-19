@@ -43,8 +43,12 @@ public class GlobalSecurityConfig  {
                                 "/v3/api-docs/**",
                                 "/v3/api-docs",
                                 "/temp/{option}"
+                                "/exchange-rates",
+                                "/exchange/calculate"
+
                         ).permitAll()
                         .requestMatchers("/employees/**").hasRole("ADMIN")
+                        .requestMatchers("/payment-recipients/**").hasRole("CLIENT")
                         .anyRequest().authenticated()
                 )
                 .formLogin(AbstractHttpConfigurer::disable)
