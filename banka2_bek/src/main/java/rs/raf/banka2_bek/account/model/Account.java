@@ -5,10 +5,6 @@ import rs.raf.banka2_bek.company.model.Company;
 import rs.raf.banka2_bek.currency.model.Currency;
 import rs.raf.banka2_bek.employee.model.Employee;
 
-import rs.raf.banka2_bek.account.model.AccountStatus;
-import rs.raf.banka2_bek.account.model.AccountType;
-import rs.raf.banka2_bek.account.model.AccountSubtype;
-
 import jakarta.persistence.*;
 import jakarta.validation.constraints.AssertTrue;
 import lombok.*;

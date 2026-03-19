@@ -2,7 +2,6 @@ package rs.raf.banka2_bek.auth.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -43,8 +42,10 @@ public class GlobalSecurityConfig  {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/v3/api-docs",
+                                "/temp/{option}"
                                 "/exchange-rates",
                                 "/exchange/calculate"
+
                         ).permitAll()
                         .requestMatchers("/employees/**").hasRole("ADMIN")
                         .requestMatchers("/payment-recipients/**").hasRole("CLIENT")

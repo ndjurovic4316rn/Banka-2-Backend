@@ -3,6 +3,7 @@ package rs.raf.banka2_bek.notification.service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import rs.raf.banka2_bek.notification.template.AccountCreatedConfirmationEmailTemplate;
 import rs.raf.banka2_bek.notification.template.ActivationConfirmedEmailTemplate;
 import rs.raf.banka2_bek.notification.template.ActivationEmailTemplate;
 import rs.raf.banka2_bek.notification.template.PasswordResetEmailTemplate;
@@ -19,11 +20,13 @@ public class MailNotificationService {
     private final PasswordResetEmailTemplate passwordResetEmailTemplate;
     private final ActivationEmailTemplate activationEmailTemplate;
     private final ActivationConfirmedEmailTemplate activationConfirmedEmailTemplate;
+    private final AccountCreatedConfirmationEmailTemplate accountCreatedConfirmationEmailTemplate;
 
     public MailNotificationService(JavaMailSender mailSender,
                                    PasswordResetEmailTemplate passwordResetEmailTemplate,
                                    ActivationEmailTemplate activationEmailTemplate,
                                    ActivationConfirmedEmailTemplate activationConfirmedEmailTemplate,
+                                   AccountCreatedConfirmationEmailTemplate accountCreatedConfirmationEmailTemplate,
                                    @Value("${spring.mail.username}") String fromAddress,
                                    @Value("${notification.password-reset-url-base}") String passwordResetUrlBase,
                                    @Value("${notification.password-reset-page-path:/reset-password}") String passwordResetPagePath,
@@ -38,6 +41,7 @@ public class MailNotificationService {
         this.passwordResetPagePath = passwordResetPagePath;
         this.activationUrlBase = activationUrlBase;
         this.activationPagePath = activationPagePath;
+        this.accountCreatedConfirmationEmailTemplate = accountCreatedConfirmationEmailTemplate;
     }
 
     public void sendPasswordResetMail(String toEmail, String token) {
@@ -59,6 +63,13 @@ public class MailNotificationService {
     public void sendActivationConfirmationMail(String toEmail, String firstName) {
         String subject = activationConfirmedEmailTemplate.buildSubject();
         String html = activationConfirmedEmailTemplate.buildBody(firstName);
+
+        HtmlMailSender.sendHtmlMail(mailSender, fromAddress, toEmail, subject, html);
+    }
+
+    public void sendAccountCreatedConfirmationMail(String toEmail, String firstName, String accountNumber, String accountType) {
+        String subject = accountCreatedConfirmationEmailTemplate.buildSubject();
+        String html = accountCreatedConfirmationEmailTemplate.buildBody(firstName, accountNumber, accountType);
 
         HtmlMailSender.sendHtmlMail(mailSender, fromAddress, toEmail, subject, html);
     }

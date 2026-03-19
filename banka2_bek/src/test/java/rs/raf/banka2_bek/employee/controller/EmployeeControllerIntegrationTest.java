@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.*;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -64,6 +65,12 @@ class EmployeeControllerIntegrationTest {
 
     @BeforeEach
     void cleanDatabase() {
+        restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+            @Override
+            public boolean hasError(HttpStatusCode statusCode) {
+                return false;
+            }
+        });
         passwordResetTokenRepository.deleteAll();
         activationTokenRepository.deleteAll();
         employeeRepository.deleteAll();

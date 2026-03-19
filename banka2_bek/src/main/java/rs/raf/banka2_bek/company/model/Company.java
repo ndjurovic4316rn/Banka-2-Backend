@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import rs.raf.banka2_bek.account.model.Account;
-import rs.raf.banka2_bek.company.model.AuthorizedPerson;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
