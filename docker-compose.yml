@@ -52,12 +52,13 @@ services:
       - -c
       - |
         echo 'Cekam da backend kreira tabele...'
-        sleep 25
-        for i in 1 2 3 4 5 6 7 8 9 10; do
-          mysql -h db -u banka2user -pbanka2pass banka2 -e 'SHOW TABLES LIKE "users"' 2>/dev/null | grep -q users && break
+        sleep 40
+        for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+          mysql --default-character-set=utf8mb4 -h db -u banka2user -pbanka2pass banka2 -e 'SELECT 1 FROM users LIMIT 1' 2>/dev/null && break
           echo "Pokusaj $$i - tabele jos nisu kreirane, cekam..."
           sleep 10
         done
+        sleep 5
         echo 'Ubacujem seed podatke...'
         mysql --default-character-set=utf8mb4 -h db -u banka2user -pbanka2pass banka2 < /seed.sql
         echo 'Seed uspesno ubasen!'
