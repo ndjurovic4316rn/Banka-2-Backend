@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class TransactionResponseDto {
     Long id;
     String accountNumber;
+    String toAccountNumber;
     String currencyCode;
     String description;
     TransactionType type;

@@ -23,8 +23,10 @@ import rs.raf.banka2_bek.payment.model.Payment;
 import rs.raf.banka2_bek.payment.model.PaymentStatus;
 import rs.raf.banka2_bek.payment.repository.PaymentAccountRepository;
 import rs.raf.banka2_bek.payment.repository.PaymentRepository;
+import rs.raf.banka2_bek.payment.service.PaymentReceiptPdfGenerator;
 import rs.raf.banka2_bek.payment.service.PaymentService;
 import rs.raf.banka2_bek.transaction.dto.TransactionListItemDto;
+import rs.raf.banka2_bek.transaction.dto.TransactionResponseDto;
 import rs.raf.banka2_bek.transaction.dto.TransactionType;
 import rs.raf.banka2_bek.transaction.service.TransactionService;
 
@@ -44,10 +46,12 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentAccountRepository paymentAccountRepository;
     private final ClientRepository clientRepository;
     private final TransactionService transactionService;
+    private final PaymentReceiptPdfGenerator paymentReceiptPdfGenerator;
     private final ExchangeService exchangeService;
     private static final int ORDER_NUMBER_MAX_RETRIES = 5;
 
     //Trenutno podrzava samo placanja u okviru iste banke
+    //TODO: srediti exceptione
     @Override
     @Transactional
     public PaymentResponseDto createPayment(CreatePaymentRequestDto request) {
@@ -100,6 +104,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         BigDecimal creditedAmount = amount.multiply(exRate);
+        String paymentCode = request.getPaymentCode().getCode();
 
         fromAccount.setBalance(fromAccount.getBalance().subtract(amount.add(transactionFee)));
         fromAccount.setAvailableBalance(fromAccount.getAvailableBalance().subtract(amount.add(transactionFee)));
@@ -115,7 +120,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .amount(amount)
                 .fee(transactionFee)
                 .currency(fromAccount.getCurrency())
-                .paymentCode(request.getPaymentCode())
+                .paymentCode(paymentCode)
                 .referenceNumber(request.getReferenceNumber())
                 .purpose(request.getDescription())
                 .status(PaymentStatus.COMPLETED)
@@ -124,6 +129,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         Payment savedPayment = null;
 
+        //Pokusava da generise jedinstven payment broj pomocu uk constrainta
         for (int attempt = 1; attempt <= ORDER_NUMBER_MAX_RETRIES; attempt++) {
             try {
                 base.setOrderNumber(generateOrderNumber());
@@ -175,6 +181,14 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new IllegalArgumentException("Payment with ID " + paymentId + " not found."));
         return toResponse(payment, client.getId());
+    }
+
+    @Override
+    public byte[] getPaymentReceipt(Long paymentId) {
+        Long clientId = getAuthenticatedClient().getId();
+        TransactionResponseDto transaction = transactionService.getReceiptTransaction(paymentId, clientId);
+
+        return paymentReceiptPdfGenerator.generate(transaction);
     }
 
     @Override
@@ -258,18 +272,6 @@ public class PaymentServiceImpl implements PaymentService {
                 ? PaymentDirection.OUTGOING
                 : PaymentDirection.INCOMING;
     }
-
-    /*private PaymentListItemDto toPaymentHistoryItem(TransactionListItemDto transaction) {
-        return PaymentListItemDto.builder()
-                .id(transaction.getPaymentId() != null ? transaction.getPaymentId() : transaction.getId())
-                .orderNumber(transaction.getOrderNumber())
-                .fromAccount(transaction.getFromAccount())
-                .toAccount(transaction.getToAccount())
-                .amount(transaction.getAmount() != null ? transaction.getAmount() : resolveAmount(transaction))
-                .status(transaction.getStatus())
-                .createdAt(transaction.getCreatedAt())
-                .build();
-    } */
 
     private String getAuthenticatedUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

@@ -31,6 +31,8 @@ public interface PaymentService {
 
     PaymentResponseDto getPaymentById(Long paymentId);
 
+    byte[] getPaymentReceipt(Long paymentId);
+
     default Page<TransactionListItemDto> getPaymentHistory(Pageable pageable) {
         return getPaymentHistory(pageable, null, null, null, null, null);
     }

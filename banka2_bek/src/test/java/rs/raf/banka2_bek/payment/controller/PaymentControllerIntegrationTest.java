@@ -42,6 +42,7 @@ import rs.raf.banka2_bek.transaction.repository.TransactionRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -313,7 +314,7 @@ class PaymentControllerIntegrationTest {
                 String.class
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).contains("Insufficient funds");
 
         Account fromAfter = paymentAccountRepository.findByAccountNumber(fromNumber).orElseThrow();
@@ -355,7 +356,7 @@ class PaymentControllerIntegrationTest {
                 String.class
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).contains("Destination account does not exist");
 
         Account fromAfter = paymentAccountRepository.findByAccountNumber(fromNumber).orElseThrow();
@@ -469,6 +470,93 @@ class PaymentControllerIntegrationTest {
 
         assertThat(paymentsResponse.getStatusCode().value()).isIn(401, 403);
         assertThat(historyResponse.getStatusCode().value()).isIn(401, 403);
+    }
+
+    @Test
+    void getPaymentReceipt_returnsPdfForOwnedTransaction() throws Exception {
+        Client sender = createClient("sender.receipt@test.com");
+        Client receiver = createClient("receiver.receipt@test.com");
+        Employee employee = createEmployee("employee.receipt@test.com", "employee.receipt");
+        Currency eur = ensureCurrency("EUR", "Euro", "E", "EU");
+
+        String fromAccount = "717171717171717171";
+        String toAccount = "818181818181818181";
+
+        createAccount(fromAccount, sender, employee, eur, new BigDecimal("1000.00"));
+        createAccount(toAccount, receiver, employee, eur, new BigDecimal("500.00"));
+
+        User senderUser = createAuthUserForClient(sender);
+        String senderToken = jwtService.generateAccessToken(senderUser);
+
+        postPayment(fromAccount, toAccount, new BigDecimal("150.00"), senderToken, "REF-RECEIPT-1");
+
+        ResponseEntity<String> historyResponse = restTemplate.exchange(
+                url("/payments/history?type=PAYMENT"),
+                HttpMethod.GET,
+                new HttpEntity<>(jsonHeaders(senderToken)),
+                String.class
+        );
+
+        JsonNode historyContent = objectMapper.readTree(historyResponse.getBody()).path("content");
+        Long transactionId = historyContent.get(0).path("id").asLong();
+
+        ResponseEntity<byte[]> receiptResponse = restTemplate.exchange(
+                url("/payments/" + transactionId + "/receipt"),
+                HttpMethod.GET,
+                new HttpEntity<>(jsonHeaders(senderToken)),
+                byte[].class
+        );
+
+        assertThat(receiptResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(receiptResponse.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PDF);
+        assertThat(receiptResponse.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+                .contains("transaction-receipt-" + transactionId + ".pdf");
+        assertThat(receiptResponse.getBody()).isNotNull();
+        assertThat(receiptResponse.getBody().length).isGreaterThan(100);
+        assertThat(new String(receiptResponse.getBody(), 0, 4, StandardCharsets.US_ASCII)).isEqualTo("%PDF");
+    }
+
+    @Test
+    void getPaymentReceipt_rejectsWhenTransactionBelongsToAnotherClient() throws Exception {
+        Client sender = createClient("sender.receipt.denied@test.com");
+        Client receiver = createClient("receiver.receipt.denied@test.com");
+        Client outsider = createClient("outsider.receipt.denied@test.com");
+        Employee employee = createEmployee("employee.receipt.denied@test.com", "employee.receipt.denied");
+        Currency eur = ensureCurrency("EUR", "Euro", "E", "EU");
+
+        String fromAccount = "919191919191919192";
+        String toAccount = "929292929292929292";
+
+        createAccount(fromAccount, sender, employee, eur, new BigDecimal("1000.00"));
+        createAccount(toAccount, receiver, employee, eur, new BigDecimal("500.00"));
+
+        User senderUser = createAuthUserForClient(sender);
+        User outsiderUser = createAuthUserForClient(outsider);
+
+        String senderToken = jwtService.generateAccessToken(senderUser);
+        String outsiderToken = jwtService.generateAccessToken(outsiderUser);
+
+        postPayment(fromAccount, toAccount, new BigDecimal("90.00"), senderToken, "REF-RECEIPT-2");
+
+        ResponseEntity<String> historyResponse = restTemplate.exchange(
+                url("/payments/history?type=PAYMENT"),
+                HttpMethod.GET,
+                new HttpEntity<>(jsonHeaders(senderToken)),
+                String.class
+        );
+
+        JsonNode historyContent = objectMapper.readTree(historyResponse.getBody()).path("content");
+        Long senderTransactionId = historyContent.get(0).path("id").asLong();
+
+        ResponseEntity<String> deniedResponse = restTemplate.exchange(
+                url("/payments/" + senderTransactionId + "/receipt"),
+                HttpMethod.GET,
+                new HttpEntity<>(jsonHeaders(outsiderToken)),
+                String.class
+        );
+
+        assertThat(deniedResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(deniedResponse.getBody()).contains("not found for authenticated client");
     }
 
     private ResponseEntity<String> postPayment(String fromAccount,

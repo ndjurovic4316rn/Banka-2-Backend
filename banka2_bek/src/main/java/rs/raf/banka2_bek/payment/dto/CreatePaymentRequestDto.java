@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import org.hibernate.validator.constraints.Length;
+import rs.raf.banka2_bek.payment.model.PaymentCode;
 
 import java.math.BigDecimal;
 
@@ -23,8 +24,8 @@ public class CreatePaymentRequestDto {
     @DecimalMin(value = "0.01", message = "Amount must be greater than zero")
     private BigDecimal amount;
 
-    @NotBlank(message = "Payment code is required")
-    private String paymentCode;
+    @NotNull(message = "Payment code is required")
+    private PaymentCode paymentCode;
 
     private String referenceNumber;
 

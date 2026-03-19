@@ -105,6 +105,15 @@ public class TransactionServiceImpl implements TransactionService {
         return toResponse(transaction);
     }
 
+    @Override
+    public TransactionResponseDto getReceiptTransaction(Long transactionId, Long clientId) {
+        Transaction transaction = transactionRepository.findReceiptTransactionForClient(transactionId, clientId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Transaction with ID " + transactionId + " not found for authenticated client."
+                ));
+        return toResponse(transaction);
+    }
+
     private TransactionResponseDto toResponse(Transaction transaction) {
         TransactionType type = transaction.getPayment() != null ? TransactionType.PAYMENT : TransactionType.TRANSFER;
 
@@ -112,6 +121,7 @@ public class TransactionServiceImpl implements TransactionService {
                 .id(transaction.getId())
                 .type(type)
                 .accountNumber(transaction.getAccount() != null ? transaction.getAccount().getAccountNumber() : null)
+                .toAccountNumber(resolveToAccountNumber(transaction))
                 .currencyCode(transaction.getCurrency() != null ? transaction.getCurrency().getCode() : null)
                 .description(transaction.getDescription())
                 .debit(transaction.getDebit())
@@ -165,5 +175,15 @@ public class TransactionServiceImpl implements TransactionService {
     private BigDecimal resolveAmount(Transaction transaction) {
         BigDecimal debit = orZero(transaction.getDebit());
         return debit.compareTo(BigDecimal.ZERO) > 0 ? debit : orZero(transaction.getCredit());
+    }
+
+    private String resolveToAccountNumber(Transaction transaction) {
+        if (transaction.getPayment() != null) {
+            return transaction.getPayment().getToAccountNumber();
+        }
+        if (transaction.getTransfer() != null && transaction.getTransfer().getToAccount() != null) {
+            return transaction.getTransfer().getToAccount().getAccountNumber();
+        }
+        return null;
     }
 }

@@ -11,9 +11,25 @@ import rs.raf.banka2_bek.transaction.model.Transaction;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
     Page<Transaction> findByAccountClientId(Long clientId, Pageable pageable);
+
+    @Query("""
+            select t from Transaction t
+            left join fetch t.account a
+            left join fetch t.currency c
+            left join fetch t.payment p
+            left join fetch p.fromAccount fa
+            left join fetch t.transfer tr
+            where t.id = :transactionId
+              and a.client.id = :clientId
+            """)
+    Optional<Transaction> findReceiptTransactionForClient(
+            @Param("transactionId") Long transactionId,
+            @Param("clientId") Long clientId
+    );
 
     @Query("""
        select t from Transaction t

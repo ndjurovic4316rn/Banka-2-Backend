@@ -14,18 +14,19 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import rs.raf.banka2_bek.account.model.Account;
 import rs.raf.banka2_bek.account.model.AccountStatus;
-import rs.raf.banka2_bek.auth.model.User;
-import rs.raf.banka2_bek.auth.repository.UserRepository;
 import rs.raf.banka2_bek.client.repository.ClientRepository;
 import rs.raf.banka2_bek.currency.model.Currency;
 import rs.raf.banka2_bek.exchange.ExchangeService;
 import rs.raf.banka2_bek.exchange.dto.ExchangeRateDto;
 import rs.raf.banka2_bek.payment.dto.CreatePaymentRequestDto;
 import rs.raf.banka2_bek.payment.dto.PaymentResponseDto;
+import rs.raf.banka2_bek.payment.model.PaymentCode;
 import rs.raf.banka2_bek.payment.model.Payment;
 import rs.raf.banka2_bek.payment.repository.PaymentAccountRepository;
 import rs.raf.banka2_bek.payment.repository.PaymentRepository;
 import rs.raf.banka2_bek.payment.service.implementation.PaymentServiceImpl;
+import rs.raf.banka2_bek.transaction.dto.TransactionResponseDto;
+import rs.raf.banka2_bek.transaction.dto.TransactionType;
 import rs.raf.banka2_bek.transaction.service.TransactionService;
 import rs.raf.banka2_bek.client.model.Client;
 
@@ -56,6 +57,8 @@ class PaymentServiceImplTest {
     @Mock
     private TransactionService transactionService;
     @Mock
+    private PaymentReceiptPdfGenerator paymentReceiptPdfGenerator;
+    @Mock
     private ExchangeService exchangeService;
 
     @InjectMocks
@@ -73,7 +76,7 @@ class PaymentServiceImplTest {
         request.setFromAccount("111111111111111111");
         request.setToAccount("222222222222222222");
         request.setAmount(new BigDecimal("100.00"));
-        request.setPaymentCode("289");
+        request.setPaymentCode(PaymentCode.CODE_289);
         request.setReferenceNumber("REF-1");
         request.setDescription("Test payment");
 
@@ -397,6 +400,37 @@ class PaymentServiceImplTest {
         assertThatThrownBy(() -> paymentService.createPayment(request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Authenticated user is required");
+    }
+
+    @Test
+    void getPaymentReceipt_returnsPdfForOwnedTransaction() {
+        TransactionResponseDto transaction = TransactionResponseDto.builder()
+                .id(55L)
+                .type(TransactionType.PAYMENT)
+                .accountNumber(fromAccount.getAccountNumber())
+                .currencyCode(eur.getCode())
+                .debit(new BigDecimal("50.00"))
+                .build();
+
+        byte[] expected = "%PDF-test".getBytes();
+
+        when(transactionService.getReceiptTransaction(55L, client.getId())).thenReturn(transaction);
+        when(paymentReceiptPdfGenerator.generate(transaction)).thenReturn(expected);
+
+        byte[] result = paymentService.getPaymentReceipt(55L);
+
+        assertThat(result).isEqualTo(expected);
+        verify(paymentReceiptPdfGenerator).generate(transaction);
+    }
+
+    @Test
+    void getPaymentReceipt_throwsWhenTransactionNotOwnedOrMissing() {
+        when(transactionService.getReceiptTransaction(55L, client.getId()))
+                .thenThrow(new IllegalArgumentException("Transaction with ID 55 not found for authenticated client."));
+
+        assertThatThrownBy(() -> paymentService.getPaymentReceipt(55L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Transaction with ID 55 not found");
     }
 
 //    @Test
