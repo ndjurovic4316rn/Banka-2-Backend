@@ -169,10 +169,7 @@ class ActuaryControllerIntegrationTest {
                 String.class
         );
 
-        // Izvuci token iz JSON odgovora
-        // Pretpostavka: odgovor sadrzi "token":"..." ili "accessToken":"..."
         String responseBody = response.getBody();
-        // Prosti parser — trazi prvi string posle "token":"
         int tokenStart = responseBody.indexOf("accessToken\":\"") + 14;
         int tokenEnd = responseBody.indexOf("\"", tokenStart);
         return responseBody.substring(tokenStart, tokenEnd);
