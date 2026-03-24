@@ -76,11 +76,15 @@ public class ListingServiceImpl implements ListingService {
     @Override
     public List<ListingDailyPriceDto> getListingHistory(Long listingId, String period) {
 
-        if (!listingRepository.existsById(listingId))
+        Listing listing = listingRepository.findById(listingId).orElse(null);
+
+        if (listing == null)
             throw new EntityNotFoundException("Listing id: " + listingId + " not found.");
 
-        LocalDate now = LocalDate.now();
+        if(listing.getListingType() == ListingType.FOREX && isClient())
+            throw new IllegalStateException("Klijenti nemaju pristup FOREX hartijama.");
 
+        LocalDate now = LocalDate.now();
         List<ListingDailyPriceInfo> dailyPrices;
 
         if ("DAY".equalsIgnoreCase(period)) dailyPrices = dailyPriceRepository.findByListingIdAndDate(listingId, now);
