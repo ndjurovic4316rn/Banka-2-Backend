@@ -1,5 +1,6 @@
 package rs.raf.banka2_bek.stock.repository;
 
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 import rs.raf.banka2_bek.stock.model.Listing;
 import rs.raf.banka2_bek.stock.model.ListingType;
@@ -14,15 +15,15 @@ public final class ListingSpec {
      */
     public static Specification<Listing> byTypeAndSearch(ListingType type, String search) {
         return (root, query, cb) -> {
-            var typePredicate = cb.equal(root.get("listingType"), type);
+            Predicate typePredicate = cb.equal(root.get("listingType"), type);
 
             if (search == null || search.isBlank()) {
                 return typePredicate;
             }
 
-            String pattern = "%" + search.toLowerCase() + "%";
-            var tickerMatch = cb.like(cb.lower(root.get("ticker")), pattern);
-            var nameMatch   = cb.like(cb.lower(root.get("name")),   pattern);
+            String pattern = "%" + search.toLowerCase() + "%"; //contains SQL pattern
+            Predicate tickerMatch = cb.like(cb.lower(root.get("ticker")), pattern);
+            Predicate nameMatch   = cb.like(cb.lower(root.get("name")),   pattern);
 
             return cb.and(typePredicate, cb.or(tickerMatch, nameMatch));
         };

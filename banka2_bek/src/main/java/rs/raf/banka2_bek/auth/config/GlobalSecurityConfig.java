@@ -32,6 +32,7 @@ public class GlobalSecurityConfig  {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                "/error",
                                 "/auth/register",
                                 "/auth/login",
                                 "/auth/password_reset/request",
@@ -59,6 +60,7 @@ public class GlobalSecurityConfig  {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/cards/requests").hasRole("ADMIN")
                         .requestMatchers("/loans/requests/**").hasRole("ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/listings/refresh").hasRole("EMPLOYEE")
+                        .requestMatchers("/actuaries/**").hasAnyAuthority("ADMIN", "SUPERVISOR")
                         .anyRequest().authenticated()
                 )
                 .formLogin(AbstractHttpConfigurer::disable)
