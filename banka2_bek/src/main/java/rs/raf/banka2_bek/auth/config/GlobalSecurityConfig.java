@@ -26,7 +26,7 @@ public class GlobalSecurityConfig  {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http)  {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
@@ -50,6 +50,7 @@ public class GlobalSecurityConfig  {
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/accounts/requests/*/approve").hasAnyRole("ADMIN", "EMPLOYEE")
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/accounts/requests/*/reject").hasAnyRole("ADMIN", "EMPLOYEE")
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/accounts/requests").hasAnyRole("ADMIN", "EMPLOYEE")
+                        .requestMatchers("/accounts/bank").hasAnyRole("ADMIN", "EMPLOYEE")
                         .requestMatchers("/accounts/all/**").hasAnyRole("ADMIN", "EMPLOYEE")
                         .requestMatchers("/accounts/client/**").hasAnyRole("ADMIN", "EMPLOYEE")
                         .requestMatchers("/cards/*/unblock").hasAnyRole("ADMIN", "EMPLOYEE")
@@ -73,7 +74,7 @@ public class GlobalSecurityConfig  {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 
