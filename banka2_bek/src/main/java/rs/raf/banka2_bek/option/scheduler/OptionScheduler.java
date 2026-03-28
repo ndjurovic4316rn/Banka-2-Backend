@@ -77,31 +77,27 @@ public class OptionScheduler {
      */
     @Scheduled(cron = "0 0 3 * * *")
     public void dailyOptionMaintenance() {
-        // TODO: Implementirati
-        //
-        // log.info("Pocetak dnevnog odrzavanja opcija...");
-        //
-        // try {
-        //     cleanupExpiredOptions();
-        // } catch (Exception e) {
-        //     log.error("Greska pri brisanju isteklih opcija: {}", e.getMessage(), e);
-        // }
-        //
-        // try {
-        //     generateNewOptions();
-        // } catch (Exception e) {
-        //     log.error("Greska pri generisanju novih opcija: {}", e.getMessage(), e);
-        // }
-        //
-        // try {
-        //     recalculatePrices();
-        // } catch (Exception e) {
-        //     log.error("Greska pri rekalkulaciji cena opcija: {}", e.getMessage(), e);
-        // }
-        //
-        // log.info("Dnevno odrzavanje opcija zavrseno.");
+        log.info("Pocetak dnevnog odrzavanja opcija...");
 
-        throw new UnsupportedOperationException("OptionScheduler.dailyOptionMaintenance() nije implementiran");
+        try {
+            cleanupExpiredOptions();
+        } catch (Exception e) {
+            log.error("Greska pri brisanju isteklih opcija: {}", e.getMessage(), e);
+        }
+
+        try {
+            generateNewOptions();
+        } catch (Exception e) {
+            log.error("Greska pri generisanju novih opcija: {}", e.getMessage(), e);
+        }
+
+        try {
+            recalculatePrices();
+        } catch (Exception e) {
+            log.error("Greska pri rekalkulaciji cena opcija: {}", e.getMessage(), e);
+        }
+
+        log.info("Dnevno odrzavanje opcija zavrseno.");
     }
 
     /**
@@ -118,18 +114,14 @@ public class OptionScheduler {
      */
     @Transactional
     protected void cleanupExpiredOptions() {
-        // TODO: Implementirati
-        //
-        // List<Option> expired = optionRepository.findBySettlementDateBefore(LocalDate.now());
-        // int count = expired.size();
-        // if (count > 0) {
-        //     optionRepository.deleteBySettlementDateBefore(LocalDate.now());
-        //     log.info("Obrisano {} isteklih opcija", count);
-        // } else {
-        //     log.info("Nema isteklih opcija za brisanje");
-        // }
-
-        throw new UnsupportedOperationException("OptionScheduler.cleanupExpiredOptions() nije implementiran");
+        List<Option> expired = optionRepository.findBySettlementDateBefore(LocalDate.now());
+        int count = expired.size();
+        if (count > 0) {
+            optionRepository.deleteBySettlementDateBefore(LocalDate.now());
+            log.info("Obrisano {} isteklih opcija", count);
+        } else {
+            log.info("Nema isteklih opcija za brisanje");
+        }
     }
 
     /**
@@ -140,12 +132,8 @@ public class OptionScheduler {
      * od danas (today + offset), pa ce svaki dan doneti nove datume.
      */
     protected void generateNewOptions() {
-        // TODO: Implementirati
-        //
-        // log.info("Generisanje novih opcija...");
-        // optionGeneratorService.generateAllOptions();
-
-        throw new UnsupportedOperationException("OptionScheduler.generateNewOptions() nije implementiran");
+        log.info("Generisanje novih opcija...");
+        optionGeneratorService.generateAllOptions();
     }
 
     /**
@@ -172,40 +160,36 @@ public class OptionScheduler {
      */
     @Transactional
     protected void recalculatePrices() {
-        // TODO: Implementirati
-        //
-        // List<Option> allOptions = optionRepository.findAll();
-        // LocalDate today = LocalDate.now();
-        // int updated = 0;
-        //
-        // for (Option option : allOptions) {
-        //     BigDecimal stockPrice = option.getStockListing().getPrice();
-        //     if (stockPrice == null) continue;
-        //
-        //     long daysToExpiry = ChronoUnit.DAYS.between(today, option.getSettlementDate());
-        //     if (daysToExpiry <= 0) continue;
-        //
-        //     double T = daysToExpiry / 365.0;
-        //     double S = stockPrice.doubleValue();
-        //     double K = option.getStrikePrice().doubleValue();
-        //     double sigma = option.getImpliedVolatility();
-        //
-        //     BigDecimal newPrice;
-        //     if (option.getOptionType() == OptionType.CALL) {
-        //         newPrice = blackScholesService.calculateCallPrice(S, K, T, sigma);
-        //     } else {
-        //         newPrice = blackScholesService.calculatePutPrice(S, K, T, sigma);
-        //     }
-        //
-        //     option.setPrice(newPrice);
-        //     option.setAsk(newPrice.multiply(BigDecimal.valueOf(1.05)).setScale(4, RoundingMode.HALF_UP));
-        //     option.setBid(newPrice.multiply(BigDecimal.valueOf(0.95)).setScale(4, RoundingMode.HALF_UP));
-        //     updated++;
-        // }
-        //
-        // optionRepository.saveAll(allOptions);
-        // log.info("Rekalkulisane cene za {} opcija", updated);
+        List<Option> allOptions = optionRepository.findAll();
+        LocalDate today = LocalDate.now();
+        int updated = 0;
 
-        throw new UnsupportedOperationException("OptionScheduler.recalculatePrices() nije implementiran");
+        for (Option option : allOptions) {
+            BigDecimal stockPrice = option.getStockListing().getPrice();
+            if (stockPrice == null) continue;
+
+            long daysToExpiry = ChronoUnit.DAYS.between(today, option.getSettlementDate());
+            if (daysToExpiry <= 0) continue;
+
+            double T = daysToExpiry / 365.0;
+            double S = stockPrice.doubleValue();
+            double K = option.getStrikePrice().doubleValue();
+            double sigma = option.getImpliedVolatility();
+
+            BigDecimal newPrice;
+            if (option.getOptionType() == OptionType.CALL) {
+                newPrice = blackScholesService.calculateCallPrice(S, K, T, sigma);
+            } else {
+                newPrice = blackScholesService.calculatePutPrice(S, K, T, sigma);
+            }
+
+            option.setPrice(newPrice);
+            option.setAsk(newPrice.multiply(BigDecimal.valueOf(1.05)).setScale(4, RoundingMode.HALF_UP));
+            option.setBid(newPrice.multiply(BigDecimal.valueOf(0.95)).setScale(4, RoundingMode.HALF_UP));
+            updated++;
+        }
+
+        optionRepository.saveAll(allOptions);
+        log.info("Rekalkulisane cene za {} opcija", updated);
     }
 }

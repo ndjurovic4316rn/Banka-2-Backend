@@ -105,7 +105,7 @@ public class OrderExecutionService {
          * 4. Svaka greska u izvrsavanju jednog naloga NE SME da prekine
          *    izvrsavanje ostalih — wrap u try-catch sa log.error().
          */
-        throw new UnsupportedOperationException("Not yet implemented");
+        log.info("TODO: implementirati"); // stub
     }
 
     /**
@@ -178,7 +178,7 @@ public class OrderExecutionService {
          *             order.getId(), fillQuantity, order.getQuantity(),
          *             executionPrice, order.getRemainingPortions(), commission);
          */
-        throw new UnsupportedOperationException("Not yet implemented");
+        log.info("TODO: implementirati"); // stub
     }
 
     /**
@@ -221,7 +221,7 @@ public class OrderExecutionService {
          *    - balanceAfter i availableAfter moraju odrazavati stanje NAKON transakcije
          *    - Provizija se NE zapisuje u ovu transakciju (zapisuje se posebno u updateAccountBalance)
          */
-        throw new UnsupportedOperationException("Not yet implemented");
+        log.info("TODO: implementirati"); // stub
     }
 
     /**
@@ -285,7 +285,7 @@ public class OrderExecutionService {
          *    - publicQuantity se NE menja pri trgovini (samo korisnik to podesava za OTC)
          *    - lastModified se automatski azurira (@PrePersist/@PreUpdate u Portfolio modelu)
          */
-        throw new UnsupportedOperationException("Not yet implemented");
+        log.info("TODO: implementirati"); // stub
     }
 
     /**
@@ -337,7 +337,7 @@ public class OrderExecutionService {
          *      provizija se NE naplacuje (skida se sa bankinog racuna bez komisije)
          *    - availableBalance mora ostati >= 0
          */
-        throw new UnsupportedOperationException("Not yet implemented");
+        log.info("TODO: implementirati"); // stub
     }
 
     /**
@@ -365,6 +365,8 @@ public class OrderExecutionService {
          * StopOrderActivationService vec pretvorio u MARKET/LIMIT.
          * Ipak, za sigurnost, handle ih kao MARKET/LIMIT respektivno.
          */
-        throw new UnsupportedOperationException("Not yet implemented");
+        // TODO: implementirati racunanje provizije
+        log.debug("calculateCommission - returning ZERO (stub)");
+        return BigDecimal.ZERO;
     }
 }

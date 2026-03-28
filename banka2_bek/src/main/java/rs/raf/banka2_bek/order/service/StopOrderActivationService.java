@@ -96,6 +96,6 @@ public class StopOrderActivationService {
          *    - Vise naloga mogu imati isti listing — svi se aktiviraju nezavisno
          *    - Transakcioni integritet: @Transactional osigurava konzistentnost
          */
-        throw new UnsupportedOperationException("Not yet implemented");
+        log.info("Stop order activation check - TODO: implementirati");
     }
 }

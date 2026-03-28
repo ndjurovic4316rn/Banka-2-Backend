@@ -54,7 +54,7 @@ public class OrderScheduler {
          *    ...
          *    log.debug("Stop order check cycle completed");
          */
-        throw new UnsupportedOperationException("Not yet implemented");
+        log.info("TODO: implementirati"); // stub
     }
 
     /**
@@ -82,6 +82,6 @@ public class OrderScheduler {
          *
          * 4. Log na DEBUG nivou za pocetak/kraj ciklusa.
          */
-        throw new UnsupportedOperationException("Not yet implemented");
+        log.info("TODO: implementirati"); // stub
     }
 }

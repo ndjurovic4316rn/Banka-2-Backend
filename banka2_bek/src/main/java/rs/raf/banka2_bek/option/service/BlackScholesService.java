@@ -81,19 +81,21 @@ public class BlackScholesService {
     public BigDecimal calculateCallPrice(double spotPrice, double strikePrice,
                                          double timeToExpiryYears, double riskFreeRate,
                                          double volatility) {
-        // TODO: Implementirati Black-Scholes CALL formulu
-        //
-        // double d1 = (Math.log(spotPrice / strikePrice)
-        //              + (riskFreeRate + volatility * volatility / 2.0) * timeToExpiryYears)
-        //             / (volatility * Math.sqrt(timeToExpiryYears));
-        // double d2 = d1 - volatility * Math.sqrt(timeToExpiryYears);
-        //
-        // double callPrice = spotPrice * normalCDF(d1)
-        //                   - strikePrice * Math.exp(-riskFreeRate * timeToExpiryYears) * normalCDF(d2);
-        //
-        // return BigDecimal.valueOf(callPrice).setScale(4, java.math.RoundingMode.HALF_UP);
+        if (volatility <= 0) throw new IllegalArgumentException("Volatility must be > 0");
+        if (timeToExpiryYears <= 0) {
+            return BigDecimal.valueOf(Math.max(0, spotPrice - strikePrice))
+                    .setScale(4, java.math.RoundingMode.HALF_UP);
+        }
 
-        throw new UnsupportedOperationException("BlackScholesService.calculateCallPrice() nije implementiran");
+        double d1 = (Math.log(spotPrice / strikePrice)
+                + (riskFreeRate + volatility * volatility / 2.0) * timeToExpiryYears)
+                / (volatility * Math.sqrt(timeToExpiryYears));
+        double d2 = d1 - volatility * Math.sqrt(timeToExpiryYears);
+
+        double callPrice = spotPrice * normalCDF(d1)
+                - strikePrice * Math.exp(-riskFreeRate * timeToExpiryYears) * normalCDF(d2);
+
+        return BigDecimal.valueOf(callPrice).setScale(4, java.math.RoundingMode.HALF_UP);
     }
 
     /**
@@ -120,19 +122,21 @@ public class BlackScholesService {
     public BigDecimal calculatePutPrice(double spotPrice, double strikePrice,
                                         double timeToExpiryYears, double riskFreeRate,
                                         double volatility) {
-        // TODO: Implementirati Black-Scholes PUT formulu
-        //
-        // double d1 = (Math.log(spotPrice / strikePrice)
-        //              + (riskFreeRate + volatility * volatility / 2.0) * timeToExpiryYears)
-        //             / (volatility * Math.sqrt(timeToExpiryYears));
-        // double d2 = d1 - volatility * Math.sqrt(timeToExpiryYears);
-        //
-        // double putPrice = strikePrice * Math.exp(-riskFreeRate * timeToExpiryYears) * normalCDF(-d2)
-        //                  - spotPrice * normalCDF(-d1);
-        //
-        // return BigDecimal.valueOf(putPrice).setScale(4, java.math.RoundingMode.HALF_UP);
+        if (volatility <= 0) throw new IllegalArgumentException("Volatility must be > 0");
+        if (timeToExpiryYears <= 0) {
+            return BigDecimal.valueOf(Math.max(0, strikePrice - spotPrice))
+                    .setScale(4, java.math.RoundingMode.HALF_UP);
+        }
 
-        throw new UnsupportedOperationException("BlackScholesService.calculatePutPrice() nije implementiran");
+        double d1 = (Math.log(spotPrice / strikePrice)
+                + (riskFreeRate + volatility * volatility / 2.0) * timeToExpiryYears)
+                / (volatility * Math.sqrt(timeToExpiryYears));
+        double d2 = d1 - volatility * Math.sqrt(timeToExpiryYears);
+
+        double putPrice = strikePrice * Math.exp(-riskFreeRate * timeToExpiryYears) * normalCDF(-d2)
+                - spotPrice * normalCDF(-d1);
+
+        return BigDecimal.valueOf(putPrice).setScale(4, java.math.RoundingMode.HALF_UP);
     }
 
     /**
@@ -188,19 +192,13 @@ public class BlackScholesService {
      * @return N(x) - verovatnoca P(Z <= x) za standardnu normalnu distribuciju
      */
     protected double normalCDF(double x) {
-        // TODO: Implementirati jednu od opcija iznad
-        //
-        // Preporuka: OPCIJA 2 (Horner) jer ne zahteva eksterne zavisnosti
-        // i dovoljno je precizna za Black-Scholes kalkulacije.
-        //
-        // if (x < 0) return 1.0 - normalCDF(-x);
-        // double t = 1.0 / (1.0 + 0.2316419 * x);
-        // double d = 0.3989422804014327;
-        // double prob = d * Math.exp(-x * x / 2.0)
-        //     * t * (0.3193815 + t * (-0.3565638 + t * (1.7814779
-        //     + t * (-1.8212560 + t * 1.3302744))));
-        // return 1.0 - prob;
-
-        throw new UnsupportedOperationException("BlackScholesService.normalCDF() nije implementiran");
+        // Horner approximation (Abramowitz & Stegun, error < 1.5e-7)
+        if (x < 0) return 1.0 - normalCDF(-x);
+        double t = 1.0 / (1.0 + 0.2316419 * x);
+        double d = 0.3989422804014327; // 1/sqrt(2*PI)
+        double prob = d * Math.exp(-x * x / 2.0)
+                * t * (0.3193815 + t * (-0.3565638 + t * (1.7814779
+                + t * (-1.8212560 + t * 1.3302744))));
+        return 1.0 - prob;
     }
 }

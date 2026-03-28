@@ -78,10 +78,7 @@ public class OptionController {
     @GetMapping
     public ResponseEntity<List<OptionChainDto>> getOptionsForStock(
             @RequestParam Long stockListingId) {
-        // TODO: Implementirati
-        // return ResponseEntity.ok(optionService.getOptionsForStock(stockListingId));
-
-        throw new UnsupportedOperationException("OptionController.getOptionsForStock() nije implementiran");
+        return ResponseEntity.ok(optionService.getOptionsForStock(stockListingId));
     }
 
     /**
@@ -99,10 +96,7 @@ public class OptionController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<OptionDto> getOptionById(@PathVariable Long id) {
-        // TODO: Implementirati
-        // return ResponseEntity.ok(optionService.getOptionById(id));
-
-        throw new UnsupportedOperationException("OptionController.getOptionById() nije implementiran");
+        return ResponseEntity.ok(optionService.getOptionById(id));
     }
 
     /**
@@ -138,13 +132,9 @@ public class OptionController {
     @PreAuthorize("hasRole('ACTUARY')")
     public ResponseEntity<MessageResponseDto> exerciseOption(
             @PathVariable Long id, Authentication authentication) {
-        // TODO: Implementirati
-        //
-        // String userEmail = authentication.getName();
-        // optionService.exerciseOption(id, userEmail);
-        // return ResponseEntity.ok(new MessageResponseDto("Opcija uspesno izvrsena."));
-
-        throw new UnsupportedOperationException("OptionController.exerciseOption() nije implementiran");
+        String userEmail = authentication.getName();
+        optionService.exerciseOption(id, userEmail);
+        return ResponseEntity.ok(new MessageResponseDto("Opcija uspesno izvrsena."));
     }
 
     /**
@@ -174,11 +164,7 @@ public class OptionController {
     @PostMapping("/generate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MessageResponseDto> generateOptions() {
-        // TODO: Implementirati
-        //
-        // optionGeneratorService.generateAllOptions();
-        // return ResponseEntity.ok(new MessageResponseDto("Opcije uspesno generisane za sve akcije."));
-
-        throw new UnsupportedOperationException("OptionController.generateOptions() nije implementiran");
+        optionGeneratorService.generateAllOptions();
+        return ResponseEntity.ok(new MessageResponseDto("Opcije uspesno generisane za sve akcije."));
     }
 }

@@ -50,6 +50,6 @@ public class TaxScheduler {
         //     log.error("Greska pri obracunu poreza: {}", e.getMessage(), e);
         // }
         // TODO: Poslati email notifikacije korisnicima
-        throw new UnsupportedOperationException("calculateMonthlyTax nije implementiran");
+        log.info("Monthly tax calculation started"); try { taxService.calculateTaxForAllUsers(); log.info("Monthly tax done"); } catch (Exception e) { log.error("Tax error: {}", e.getMessage()); }
     }
 }

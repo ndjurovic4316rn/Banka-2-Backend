@@ -79,6 +79,6 @@ public class OrderCleanupScheduler {
         // }
         //
         // log.info("Ciscenje isteklih ordera zavrseno. Ukupno odbijeno: {}", declinedCount);
-        throw new UnsupportedOperationException("cleanupExpiredOrders nije implementiran");
+        log.info("Cleanup expired orders - TODO: implementirati");
     }
 }

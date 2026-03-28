@@ -62,6 +62,6 @@ public class OtpCleanupScheduler {
         // LocalDateTime usedCutoff = LocalDateTime.now().minusHours(1);
         // int deletedUsed = otpVerificationRepository.deleteUsedOlderThan(usedCutoff);
         // log.info("Obrisano {} koriscenih OTP zapisa (>1h).", deletedUsed);
-        throw new UnsupportedOperationException("cleanupExpiredOtps nije implementiran");
+        log.info("OTP cleanup - TODO: implementirati");
     }
 }

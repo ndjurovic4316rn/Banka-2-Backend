@@ -37,42 +37,21 @@ public class ExchangeManagementController {
      */
     @GetMapping
     public ResponseEntity<List<ExchangeDto>> getAllExchanges() {
-        // TODO: Implementirati prema uputstvima iznad
-        throw new UnsupportedOperationException("GET /exchanges nije implementiran");
+        return ResponseEntity.ok(exchangeManagementService.getAllExchanges());
     }
 
-    /**
-     * GET /exchanges/{acronym}
-     * Vraca detalje jedne berze sa computed statusom.
-     *
-     * TODO: Implementirati:
-     *   1. Pozvati exchangeManagementService.getByAcronym(acronym)
-     *   2. Vratiti ResponseEntity.ok(dto)
-     *   3. Hendlati slucaj kada berza ne postoji (404)
-     */
     @GetMapping("/{acronym}")
     public ResponseEntity<ExchangeDto> getByAcronym(@PathVariable String acronym) {
-        // TODO: Implementirati prema uputstvima iznad
-        throw new UnsupportedOperationException("GET /exchanges/{acronym} nije implementiran");
+        return ResponseEntity.ok(exchangeManagementService.getByAcronym(acronym));
     }
 
-    /**
-     * PATCH /exchanges/{acronym}/test-mode
-     * Ukljucuje/iskljucuje test mode za berzu. Samo admin moze pristupiti.
-     *
-     * Request body: { "enabled": true/false }
-     *
-     * TODO: Implementirati:
-     *   1. Procitati "enabled" iz request body-ja
-     *   2. Pozvati exchangeManagementService.setTestMode(acronym, enabled)
-     *   3. Vratiti ResponseEntity.ok() sa porukom potvrde
-     */
     @PatchMapping("/{acronym}/test-mode")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> setTestMode(
             @PathVariable String acronym,
             @RequestBody Map<String, Boolean> body) {
-        // TODO: Implementirati prema uputstvima iznad
-        throw new UnsupportedOperationException("PATCH /exchanges/{acronym}/test-mode nije implementiran");
+        boolean enabled = body.getOrDefault("enabled", false);
+        exchangeManagementService.setTestMode(acronym, enabled);
+        return ResponseEntity.ok(Map.of("message", "Test mode set to " + enabled + " for " + acronym));
     }
 }

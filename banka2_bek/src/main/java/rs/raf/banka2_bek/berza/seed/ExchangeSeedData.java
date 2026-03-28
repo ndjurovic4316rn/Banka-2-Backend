@@ -9,68 +9,12 @@ import rs.raf.banka2_bek.berza.model.Exchange;
 import rs.raf.banka2_bek.berza.repository.ExchangeRepository;
 
 import java.time.LocalTime;
+import java.util.List;
 
 /**
  * Seed komponenta koja popunjava tabelu berzi pri pokretanju aplikacije.
- *
  * Pokrece se samo ako je tabela prazna (count == 0).
  * Dodaje 4 berze: NYSE, NASDAQ, LSE, BELEX.
- *
- * TODO: Implementirati logiku:
- *   1. Proveriti da li tabela vec ima podatke (exchangeRepository.count() > 0)
- *   2. Ako ima, samo logirati "Exchange seed data already exists, skipping." i izaci
- *   3. Ako je prazna, kreirati 4 Exchange entiteta sa sledecim podacima:
- *
- *      NYSE:
- *        name = "New York Stock Exchange"
- *        acronym = "NYSE"
- *        micCode = "XNYS"
- *        country = "US"
- *        currency = "USD"
- *        timeZone = "America/New_York"
- *        openTime = 09:30
- *        closeTime = 16:00
- *        preMarketOpenTime = 04:00
- *        postMarketCloseTime = 20:00
- *
- *      NASDAQ:
- *        name = "NASDAQ"
- *        acronym = "NASDAQ"
- *        micCode = "XNAS"
- *        country = "US"
- *        currency = "USD"
- *        timeZone = "America/New_York"
- *        openTime = 09:30
- *        closeTime = 16:00
- *        preMarketOpenTime = 04:00
- *        postMarketCloseTime = 20:00
- *
- *      LSE:
- *        name = "London Stock Exchange"
- *        acronym = "LSE"
- *        micCode = "XLON"
- *        country = "GB"
- *        currency = "GBP"
- *        timeZone = "Europe/London"
- *        openTime = 08:00
- *        closeTime = 16:30
- *        preMarketOpenTime = null
- *        postMarketCloseTime = null
- *
- *      BELEX:
- *        name = "Belgrade Stock Exchange"
- *        acronym = "BELEX"
- *        micCode = "XBEL"
- *        country = "RS"
- *        currency = "RSD"
- *        timeZone = "Europe/Belgrade"
- *        openTime = 09:00
- *        closeTime = 15:00
- *        preMarketOpenTime = null
- *        postMarketCloseTime = null
- *
- *   4. Sacuvati sve sa exchangeRepository.saveAll(list)
- *   5. Logirati "Seeded {} exchanges." sa brojem unetih
  */
 @Component
 @RequiredArgsConstructor
@@ -81,7 +25,37 @@ public class ExchangeSeedData implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        // TODO: Implementirati prema uputstvima iznad
-        throw new UnsupportedOperationException("ExchangeSeedData.run() nije implementiran");
+        if (exchangeRepository.count() > 0) {
+            log.info("Exchange seed data already exists, skipping.");
+            return;
+        }
+
+        List<Exchange> exchanges = List.of(
+                Exchange.builder()
+                        .name("New York Stock Exchange").acronym("NYSE").micCode("XNYS")
+                        .country("US").currency("USD").timeZone("America/New_York")
+                        .openTime(LocalTime.of(9, 30)).closeTime(LocalTime.of(16, 0))
+                        .preMarketOpenTime(LocalTime.of(4, 0)).postMarketCloseTime(LocalTime.of(20, 0))
+                        .build(),
+                Exchange.builder()
+                        .name("NASDAQ").acronym("NASDAQ").micCode("XNAS")
+                        .country("US").currency("USD").timeZone("America/New_York")
+                        .openTime(LocalTime.of(9, 30)).closeTime(LocalTime.of(16, 0))
+                        .preMarketOpenTime(LocalTime.of(4, 0)).postMarketCloseTime(LocalTime.of(20, 0))
+                        .build(),
+                Exchange.builder()
+                        .name("London Stock Exchange").acronym("LSE").micCode("XLON")
+                        .country("GB").currency("GBP").timeZone("Europe/London")
+                        .openTime(LocalTime.of(8, 0)).closeTime(LocalTime.of(16, 30))
+                        .build(),
+                Exchange.builder()
+                        .name("Belgrade Stock Exchange").acronym("BELEX").micCode("XBEL")
+                        .country("RS").currency("RSD").timeZone("Europe/Belgrade")
+                        .openTime(LocalTime.of(9, 0)).closeTime(LocalTime.of(15, 0))
+                        .build()
+        );
+
+        exchangeRepository.saveAll(exchanges);
+        log.info("Seeded {} exchanges.", exchanges.size());
     }
 }

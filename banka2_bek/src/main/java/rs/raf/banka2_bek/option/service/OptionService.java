@@ -62,43 +62,39 @@ public class OptionService {
      * @throws EntityNotFoundException ako listing ne postoji
      */
     public List<OptionChainDto> getOptionsForStock(Long listingId) {
-        // TODO: Implementirati option chain logiku
-        //
-        // Listing listing = listingRepository.findById(listingId)
-        //     .orElseThrow(() -> new EntityNotFoundException("Listing id: " + listingId + " not found."));
-        //
-        // List<Option> options = optionRepository.findByStockListingId(listingId);
-        // BigDecimal currentPrice = listing.getPrice();
-        //
-        // Map<LocalDate, List<Option>> grouped = options.stream()
-        //     .collect(Collectors.groupingBy(Option::getSettlementDate));
-        //
-        // return grouped.entrySet().stream()
-        //     .sorted(Map.Entry.comparingByKey())
-        //     .map(entry -> {
-        //         OptionChainDto chain = new OptionChainDto();
-        //         chain.setSettlementDate(entry.getKey());
-        //         chain.setCurrentStockPrice(currentPrice);
-        //
-        //         List<OptionDto> calls = entry.getValue().stream()
-        //             .filter(o -> o.getOptionType() == OptionType.CALL)
-        //             .sorted(Comparator.comparing(Option::getStrikePrice))
-        //             .map(o -> OptionMapper.toDto(o, currentPrice))
-        //             .toList();
-        //         chain.setCalls(calls);
-        //
-        //         List<OptionDto> puts = entry.getValue().stream()
-        //             .filter(o -> o.getOptionType() == OptionType.PUT)
-        //             .sorted(Comparator.comparing(Option::getStrikePrice))
-        //             .map(o -> OptionMapper.toDto(o, currentPrice))
-        //             .toList();
-        //         chain.setPuts(puts);
-        //
-        //         return chain;
-        //     })
-        //     .toList();
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new EntityNotFoundException("Listing id: " + listingId + " not found."));
 
-        throw new UnsupportedOperationException("OptionService.getOptionsForStock() nije implementiran");
+        List<Option> options = optionRepository.findByStockListingId(listingId);
+        BigDecimal currentPrice = listing.getPrice();
+
+        Map<LocalDate, List<Option>> grouped = options.stream()
+                .collect(Collectors.groupingBy(Option::getSettlementDate));
+
+        return grouped.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    OptionChainDto chain = new OptionChainDto();
+                    chain.setSettlementDate(entry.getKey());
+                    chain.setCurrentStockPrice(currentPrice);
+
+                    List<OptionDto> calls = entry.getValue().stream()
+                            .filter(o -> o.getOptionType() == OptionType.CALL)
+                            .sorted(Comparator.comparing(Option::getStrikePrice))
+                            .map(o -> OptionMapper.toDto(o, currentPrice))
+                            .toList();
+                    chain.setCalls(calls);
+
+                    List<OptionDto> puts = entry.getValue().stream()
+                            .filter(o -> o.getOptionType() == OptionType.PUT)
+                            .sorted(Comparator.comparing(Option::getStrikePrice))
+                            .map(o -> OptionMapper.toDto(o, currentPrice))
+                            .toList();
+                    chain.setPuts(puts);
+
+                    return chain;
+                })
+                .toList();
     }
 
     /**
@@ -116,15 +112,11 @@ public class OptionService {
      * @throws EntityNotFoundException ako opcija ne postoji
      */
     public OptionDto getOptionById(Long optionId) {
-        // TODO: Implementirati
-        //
-        // Option option = optionRepository.findById(optionId)
-        //     .orElseThrow(() -> new EntityNotFoundException("Option id: " + optionId + " not found."));
-        //
-        // BigDecimal currentPrice = option.getStockListing().getPrice();
-        // return OptionMapper.toDto(option, currentPrice);
+        Option option = optionRepository.findById(optionId)
+                .orElseThrow(() -> new EntityNotFoundException("Option id: " + optionId + " not found."));
 
-        throw new UnsupportedOperationException("OptionService.getOptionById() nije implementiran");
+        BigDecimal currentPrice = option.getStockListing().getPrice();
+        return OptionMapper.toDto(option, currentPrice);
     }
 
     /**
@@ -175,36 +167,32 @@ public class OptionService {
      */
     @Transactional
     public void exerciseOption(Long optionId, String userEmail) {
-        // TODO: Implementirati exercise logiku
-        //
-        // Option option = optionRepository.findById(optionId)
-        //     .orElseThrow(() -> new EntityNotFoundException("Option id: " + optionId + " not found."));
-        //
-        // // Provera isteka
-        // if (option.getSettlementDate().isBefore(LocalDate.now())) {
-        //     throw new IllegalStateException("Opcija je istekla (settlement: " + option.getSettlementDate() + ")");
-        // }
-        //
-        // BigDecimal currentPrice = option.getStockListing().getPrice();
-        // BigDecimal strike = option.getStrikePrice();
-        //
-        // // Provera ITM
-        // if (option.getOptionType() == OptionType.CALL && currentPrice.compareTo(strike) <= 0) {
-        //     throw new IllegalStateException("CALL opcija nije in-the-money (stock: " + currentPrice + ", strike: " + strike + ")");
-        // }
-        // if (option.getOptionType() == OptionType.PUT && currentPrice.compareTo(strike) >= 0) {
-        //     throw new IllegalStateException("PUT opcija nije in-the-money (stock: " + currentPrice + ", strike: " + strike + ")");
-        // }
-        //
-        // // TODO: Integracija sa Account/Portfolio servisima
-        // //   - CALL: proveriti sredstva, kupiti akcije po strike ceni
-        // //   - PUT: proveriti portfolio, prodati akcije po strike ceni
-        //
-        // option.setOpenInterest(option.getOpenInterest() - 1);
-        // optionRepository.save(option);
-        //
-        // log.info("Opcija {} izvrsena od strane {}", option.getTicker(), userEmail);
+        Option option = optionRepository.findById(optionId)
+                .orElseThrow(() -> new EntityNotFoundException("Option id: " + optionId + " not found."));
 
-        throw new UnsupportedOperationException("OptionService.exerciseOption() nije implementiran");
+        // Provera isteka
+        if (option.getSettlementDate().isBefore(LocalDate.now())) {
+            throw new IllegalStateException("Opcija je istekla (settlement: " + option.getSettlementDate() + ")");
+        }
+
+        BigDecimal currentPrice = option.getStockListing().getPrice();
+        BigDecimal strike = option.getStrikePrice();
+
+        // Provera ITM
+        if (option.getOptionType() == OptionType.CALL && currentPrice.compareTo(strike) <= 0) {
+            throw new IllegalStateException("CALL opcija nije in-the-money (stock: " + currentPrice + ", strike: " + strike + ")");
+        }
+        if (option.getOptionType() == OptionType.PUT && currentPrice.compareTo(strike) >= 0) {
+            throw new IllegalStateException("PUT opcija nije in-the-money (stock: " + currentPrice + ", strike: " + strike + ")");
+        }
+
+        // TODO: Integracija sa Account/Portfolio servisima
+        //   - CALL: proveriti sredstva, kupiti akcije po strike ceni
+        //   - PUT: proveriti portfolio, prodati akcije po strike ceni
+
+        option.setOpenInterest(option.getOpenInterest() - 1);
+        optionRepository.save(option);
+
+        log.info("Opcija {} izvrsena od strane {}", option.getTicker(), userEmail);
     }
 }

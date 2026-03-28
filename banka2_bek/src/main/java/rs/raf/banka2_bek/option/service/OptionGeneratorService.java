@@ -13,8 +13,11 @@ import rs.raf.banka2_bek.stock.model.ListingType;
 import rs.raf.banka2_bek.stock.repository.ListingRepository;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -104,41 +107,64 @@ public class OptionGeneratorService {
      */
     @Transactional
     public void generateOptionsForListing(Listing stock) {
-        // TODO: Implementirati generisanje opcija za jedan listing
-        //
-        // if (stock == null || stock.getListingType() != ListingType.STOCK) return;
-        // BigDecimal currentPrice = stock.getPrice();
-        // if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
-        //     log.warn("Preskacemo listing {} - nema cenu", stock.getTicker());
-        //     return;
-        // }
-        //
-        // List<BigDecimal> strikes = generateStrikePrices(currentPrice);
-        // List<LocalDate> dates = generateSettlementDates();
-        // List<Option> options = new ArrayList<>();
-        //
-        // for (LocalDate date : dates) {
-        //     if (optionRepository.existsByStockListingIdAndSettlementDate(stock.getId(), date)) continue;
-        //     for (BigDecimal strike : strikes) {
-        //         double T = ChronoUnit.DAYS.between(LocalDate.now(), date) / 365.0;
-        //         double sigma = 0.15 + Math.random() * 0.45;
-        //         double S = currentPrice.doubleValue();
-        //         double K = strike.doubleValue();
-        //
-        //         // CALL
-        //         Option call = buildOption(stock, OptionType.CALL, strike, date, T, sigma, S, K);
-        //         options.add(call);
-        //
-        //         // PUT
-        //         Option put = buildOption(stock, OptionType.PUT, strike, date, T, sigma, S, K);
-        //         options.add(put);
-        //     }
-        // }
-        //
-        // optionRepository.saveAll(options);
-        // log.info("Generisano {} opcija za {}", options.size(), stock.getTicker());
+        if (stock == null || stock.getListingType() != ListingType.STOCK) return;
+        BigDecimal currentPrice = stock.getPrice();
+        if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Preskacemo listing {} - nema cenu", stock.getTicker());
+            return;
+        }
 
-        throw new UnsupportedOperationException("OptionGeneratorService.generateOptionsForListing() nije implementiran");
+        List<BigDecimal> strikes = generateStrikePrices(currentPrice);
+        List<LocalDate> dates = generateSettlementDates();
+        List<Option> options = new ArrayList<>();
+
+        for (LocalDate date : dates) {
+            if (optionRepository.existsByStockListingIdAndSettlementDate(stock.getId(), date)) continue;
+            for (BigDecimal strike : strikes) {
+                double T = ChronoUnit.DAYS.between(LocalDate.now(), date) / 365.0;
+                double sigma = 0.15 + Math.random() * 0.45;
+                double S = currentPrice.doubleValue();
+                double K = strike.doubleValue();
+
+                // CALL
+                Option call = buildOption(stock, OptionType.CALL, strike, date, T, sigma, S, K);
+                options.add(call);
+
+                // PUT
+                Option put = buildOption(stock, OptionType.PUT, strike, date, T, sigma, S, K);
+                options.add(put);
+            }
+        }
+
+        if (!options.isEmpty()) {
+            optionRepository.saveAll(options);
+        }
+        log.info("Generisano {} opcija za {}", options.size(), stock.getTicker());
+    }
+
+    private Option buildOption(Listing stock, OptionType type, BigDecimal strike,
+                               LocalDate date, double T, double sigma, double S, double K) {
+        BigDecimal price;
+        if (type == OptionType.CALL) {
+            price = blackScholesService.calculateCallPrice(S, K, T, sigma);
+        } else {
+            price = blackScholesService.calculatePutPrice(S, K, T, sigma);
+        }
+
+        Option option = new Option();
+        option.setStockListing(stock);
+        option.setOptionType(type);
+        option.setStrikePrice(strike);
+        option.setSettlementDate(date);
+        option.setImpliedVolatility(sigma);
+        option.setPrice(price);
+        option.setAsk(price.multiply(BigDecimal.valueOf(1.05)).setScale(4, RoundingMode.HALF_UP));
+        option.setBid(price.multiply(BigDecimal.valueOf(0.95)).setScale(4, RoundingMode.HALF_UP));
+        option.setVolume((long) (100 + Math.random() * 9900));
+        option.setOpenInterest(0);
+        option.setContractSize(100);
+        option.setTicker(generateTicker(stock.getTicker(), date, type, strike));
+        return option;
     }
 
     /**
@@ -153,25 +179,21 @@ public class OptionGeneratorService {
      */
     @Transactional
     public void generateAllOptions() {
-        // TODO: Implementirati generisanje opcija za sve STOCK listinge
-        //
-        // List<Listing> stocks = listingRepository.findAll().stream()
-        //     .filter(l -> l.getListingType() == ListingType.STOCK)
-        //     .toList();
-        //
-        // log.info("Generisanje opcija za {} akcija...", stocks.size());
-        // int successCount = 0;
-        // for (Listing stock : stocks) {
-        //     try {
-        //         generateOptionsForListing(stock);
-        //         successCount++;
-        //     } catch (Exception e) {
-        //         log.error("Greska pri generisanju opcija za {}: {}", stock.getTicker(), e.getMessage());
-        //     }
-        // }
-        // log.info("Uspesno generisane opcije za {}/{} akcija", successCount, stocks.size());
+        List<Listing> stocks = listingRepository.findAll().stream()
+                .filter(l -> l.getListingType() == ListingType.STOCK)
+                .toList();
 
-        throw new UnsupportedOperationException("OptionGeneratorService.generateAllOptions() nije implementiran");
+        log.info("Generisanje opcija za {} akcija...", stocks.size());
+        int successCount = 0;
+        for (Listing stock : stocks) {
+            try {
+                generateOptionsForListing(stock);
+                successCount++;
+            } catch (Exception e) {
+                log.error("Greska pri generisanju opcija za {}: {}", stock.getTicker(), e.getMessage());
+            }
+        }
+        log.info("Uspesno generisane opcije za {}/{} akcija", successCount, stocks.size());
     }
 
     /**
@@ -193,9 +215,15 @@ public class OptionGeneratorService {
      * @return sortirana lista od 10 strike cena
      */
     protected List<BigDecimal> generateStrikePrices(BigDecimal currentPrice) {
-        // TODO: Implementirati generisanje strike cena
-
-        throw new UnsupportedOperationException("OptionGeneratorService.generateStrikePrices() nije implementiran");
+        List<BigDecimal> strikes = new ArrayList<>();
+        for (int i = 1; i <= STRIKES_PER_SIDE; i++) {
+            strikes.add(currentPrice.multiply(BigDecimal.valueOf(1 + i * STRIKE_STEP_PERCENT))
+                    .setScale(2, RoundingMode.HALF_UP));
+            strikes.add(currentPrice.multiply(BigDecimal.valueOf(1 - i * STRIKE_STEP_PERCENT))
+                    .setScale(2, RoundingMode.HALF_UP));
+        }
+        strikes.sort(BigDecimal::compareTo);
+        return strikes;
     }
 
     /**
@@ -212,9 +240,17 @@ public class OptionGeneratorService {
      * @return lista od 9 settlement datuma
      */
     protected List<LocalDate> generateSettlementDates() {
-        // TODO: Implementirati generisanje settlement datuma
-
-        throw new UnsupportedOperationException("OptionGeneratorService.generateSettlementDates() nije implementiran");
+        List<LocalDate> dates = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+        // 6 dates with 6-day spacing
+        for (int i = 1; i <= 6; i++) {
+            dates.add(today.plusDays(i * 6L));
+        }
+        // 3 dates with 30-day spacing after the last
+        dates.add(today.plusDays(66));
+        dates.add(today.plusDays(96));
+        dates.add(today.plusDays(126));
+        return dates;
     }
 
     /**
@@ -240,14 +276,10 @@ public class OptionGeneratorService {
      */
     protected String generateTicker(String stockTicker, LocalDate settlementDate,
                                     OptionType optionType, BigDecimal strikePrice) {
-        // TODO: Implementirati generisanje ticker-a
-        //
-        // String dateStr = settlementDate.format(TICKER_DATE_FORMAT);
-        // String typeChar = optionType == OptionType.CALL ? "C" : "P";
-        // long strikeInt = strikePrice.multiply(BigDecimal.valueOf(1000)).longValue();
-        // String strikeStr = String.format("%08d", strikeInt);
-        // return stockTicker + dateStr + typeChar + strikeStr;
-
-        throw new UnsupportedOperationException("OptionGeneratorService.generateTicker() nije implementiran");
+        String dateStr = settlementDate.format(TICKER_DATE_FORMAT);
+        String typeChar = optionType == OptionType.CALL ? "C" : "P";
+        long strikeInt = strikePrice.multiply(BigDecimal.valueOf(1000)).longValue();
+        String strikeStr = String.format("%08d", strikeInt);
+        return stockTicker + dateStr + typeChar + strikeStr;
     }
 }

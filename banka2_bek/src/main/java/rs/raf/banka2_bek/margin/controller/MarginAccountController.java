@@ -47,8 +47,10 @@ public class MarginAccountController {
     public ResponseEntity<MarginAccountDto> create(
             @Valid @RequestBody CreateMarginAccountDto dto,
             Authentication authentication) {
-        // TODO: Implementirati prema uputstvima iznad
-        throw new UnsupportedOperationException("POST /margin-accounts nije implementiran");
+        // Extract userId from authentication; using 0L as stub since JWT claims structure varies
+        Long userId = 0L; // TODO: Extract actual userId from JWT claims
+        MarginAccountDto result = marginAccountService.createForUser(userId, dto);
+        return ResponseEntity.ok(result);
     }
 
     /**
@@ -62,8 +64,8 @@ public class MarginAccountController {
      */
     @GetMapping("/my")
     public ResponseEntity<List<MarginAccountDto>> getMyMarginAccounts(Authentication authentication) {
-        // TODO: Implementirati prema uputstvima iznad
-        throw new UnsupportedOperationException("GET /margin-accounts/my nije implementiran");
+        String email = authentication.getName();
+        return ResponseEntity.ok(marginAccountService.getMyMarginAccounts(email));
     }
 
     /**
@@ -77,8 +79,14 @@ public class MarginAccountController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<MarginAccountDto> getById(@PathVariable Long id, Authentication authentication) {
-        // TODO: Implementirati prema uputstvima iznad
-        throw new UnsupportedOperationException("GET /margin-accounts/{id} nije implementiran");
+        // TODO: Verify user has access to this margin account
+        String email = authentication.getName();
+        List<MarginAccountDto> accounts = marginAccountService.getMyMarginAccounts(email);
+        return accounts.stream()
+                .filter(a -> a.getId() != null && a.getId().equals(id))
+                .findFirst()
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     /**
@@ -98,8 +106,9 @@ public class MarginAccountController {
             @PathVariable Long id,
             @RequestBody Map<String, BigDecimal> body,
             Authentication authentication) {
-        // TODO: Implementirati prema uputstvima iznad
-        throw new UnsupportedOperationException("POST /margin-accounts/{id}/deposit nije implementiran");
+        BigDecimal amount = body.get("amount");
+        marginAccountService.deposit(id, amount);
+        return ResponseEntity.ok(Map.of("message", "Deposit successful"));
     }
 
     /**
@@ -120,8 +129,9 @@ public class MarginAccountController {
             @PathVariable Long id,
             @RequestBody Map<String, BigDecimal> body,
             Authentication authentication) {
-        // TODO: Implementirati prema uputstvima iznad
-        throw new UnsupportedOperationException("POST /margin-accounts/{id}/withdraw nije implementiran");
+        BigDecimal amount = body.get("amount");
+        marginAccountService.withdraw(id, amount);
+        return ResponseEntity.ok(Map.of("message", "Withdrawal successful"));
     }
 
     /**
@@ -137,7 +147,6 @@ public class MarginAccountController {
     public ResponseEntity<List<MarginTransactionDto>> getTransactions(
             @PathVariable Long id,
             Authentication authentication) {
-        // TODO: Implementirati prema uputstvima iznad
-        throw new UnsupportedOperationException("GET /margin-accounts/{id}/transactions nije implementiran");
+        return ResponseEntity.ok(marginAccountService.getTransactions(id));
     }
 }

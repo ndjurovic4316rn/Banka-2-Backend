@@ -60,6 +60,14 @@ public class AonValidationService {
          *      Koristiti remainingPortions jer AON zahteva da se SVE PREOSTALO popuni odjednom.
          *      Za potpuno novi nalog, remainingPortions == quantity.
          */
-        throw new UnsupportedOperationException("Not yet implemented");
+        if (!order.isAllOrNone()) {
+            return true;
+        }
+        boolean canFill = availableVolume >= order.getRemainingPortions();
+        if (!canFill) {
+            log.debug("AON order #{} cannot execute: available {} < remaining {}",
+                    order.getId(), availableVolume, order.getRemainingPortions());
+        }
+        return canFill;
     }
 }
