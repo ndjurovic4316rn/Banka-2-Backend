@@ -34,6 +34,8 @@ import rs.raf.banka2_bek.employee.repository.ActivationTokenRepository;
 import rs.raf.banka2_bek.employee.repository.EmployeeRepository;
 import rs.raf.banka2_bek.margin.repository.MarginAccountRepository;
 import rs.raf.banka2_bek.margin.repository.MarginTransactionRepository;
+import rs.raf.banka2_bek.margin.model.MarginAccount;
+import rs.raf.banka2_bek.margin.model.MarginAccountStatus;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -229,6 +231,80 @@ class MarginAccountControllerIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).contains("Pocetni depozit je obavezan");
+    }
+
+    @Test
+    void getMyMarginAccounts_returnsOnlyCurrentClientAccounts() throws Exception {
+        Client owner = createClient("owner.margin@test.com");
+        Client other = createClient("other.margin@test.com");
+        User ownerUser = createAuthUser(owner.getEmail(), "CLIENT");
+        Employee employee = createEmployee("creator.my@test.com", "creator.my");
+        Currency rsd = createCurrency("RSD", "Serbian Dinar", "RSD", "RS");
+
+        Account ownerAccount = createAccount("777777777777777781", owner, employee, rsd,
+                new BigDecimal("10000.00"), new BigDecimal("10000.00"));
+        Account otherAccount = createAccount("777777777777777782", other, employee, rsd,
+                new BigDecimal("10000.00"), new BigDecimal("10000.00"));
+
+        marginAccountRepository.save(MarginAccount.builder()
+                .account(ownerAccount)
+                .userId(owner.getId())
+                .initialMargin(new BigDecimal("10000.0000"))
+                .loanValue(new BigDecimal("5000.0000"))
+                .maintenanceMargin(new BigDecimal("5000.0000"))
+                .bankParticipation(new BigDecimal("0.50"))
+                .status(MarginAccountStatus.ACTIVE)
+                .build());
+
+        marginAccountRepository.save(MarginAccount.builder()
+                .account(otherAccount)
+                .userId(other.getId())
+                .initialMargin(new BigDecimal("6000.0000"))
+                .loanValue(new BigDecimal("3000.0000"))
+                .maintenanceMargin(new BigDecimal("3000.0000"))
+                .bankParticipation(new BigDecimal("0.50"))
+                .status(MarginAccountStatus.ACTIVE)
+                .build());
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                url("/margin-accounts/my"),
+                org.springframework.http.HttpMethod.GET,
+                new HttpEntity<>(jsonHeaders(jwtService.generateAccessToken(ownerUser))),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertThat(body.isArray()).isTrue();
+        assertThat(body.size()).isEqualTo(1);
+        assertThat(body.get(0).path("userId").asLong()).isEqualTo(owner.getId());
+        assertThat(body.get(0).path("accountNumber").asText()).isEqualTo("777777777777777781");
+    }
+
+    @Test
+    void getMyMarginAccounts_returnsForbidden_whenMissingJwt() {
+        ResponseEntity<String> response = restTemplate.getForEntity(
+                url("/margin-accounts/my"),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void getMyMarginAccounts_returnsForbidden_forAuthenticatedNonClient() {
+        User nonClient = createAuthUser("nonclient.margin@test.com", "EMPLOYEE");
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                url("/margin-accounts/my"),
+                org.springframework.http.HttpMethod.GET,
+                new HttpEntity<>(jsonHeaders(jwtService.generateAccessToken(nonClient))),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("Only clients can view margin accounts.");
     }
 
     private String url(String path) {

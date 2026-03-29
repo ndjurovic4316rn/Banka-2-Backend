@@ -10,6 +10,7 @@ import rs.raf.banka2_bek.account.model.Account;
 import rs.raf.banka2_bek.account.model.AccountStatus;
 import rs.raf.banka2_bek.account.repository.AccountRepository;
 import rs.raf.banka2_bek.client.model.Client;
+import rs.raf.banka2_bek.client.repository.ClientRepository;
 import rs.raf.banka2_bek.margin.dto.CreateMarginAccountDto;
 import rs.raf.banka2_bek.margin.dto.MarginAccountDto;
 import rs.raf.banka2_bek.margin.model.MarginAccount;
@@ -39,6 +40,8 @@ class MarginAccountServiceTest {
     private MarginTransactionRepository marginTransactionRepository;
     @Mock
     private AccountRepository accountRepository;
+    @Mock
+    private ClientRepository clientRepository;
 
     private MarginAccountService marginAccountService;
 
@@ -47,8 +50,46 @@ class MarginAccountServiceTest {
         marginAccountService = new MarginAccountService(
                 marginAccountRepository,
                 marginTransactionRepository,
-                accountRepository
+                accountRepository,
+                clientRepository
         );
+    }
+
+    @Test
+    void getMyMarginAccounts_returnsOnlyAuthenticatedClientAccounts() {
+        Client client = Client.builder().id(10L).email("client@test.com").build();
+
+        Account account = Account.builder().id(5L).accountNumber("222000112345678911").build();
+        MarginAccount marginAccount = MarginAccount.builder()
+                .id(77L)
+                .account(account)
+                .userId(10L)
+                .initialMargin(new BigDecimal("10000.0000"))
+                .loanValue(new BigDecimal("5000.0000"))
+                .maintenanceMargin(new BigDecimal("5000.0000"))
+                .bankParticipation(new BigDecimal("0.50"))
+                .status(MarginAccountStatus.ACTIVE)
+                .build();
+
+        when(clientRepository.findByEmail("client@test.com")).thenReturn(Optional.of(client));
+        when(marginAccountRepository.findByUserId(10L)).thenReturn(List.of(marginAccount));
+
+        List<MarginAccountDto> result = marginAccountService.getMyMarginAccounts("client@test.com");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(77L);
+        assertThat(result.get(0).getUserId()).isEqualTo(10L);
+        assertThat(result.get(0).getAccountId()).isEqualTo(5L);
+        assertThat(result.get(0).getAccountNumber()).isEqualTo("222000112345678911");
+    }
+
+    @Test
+    void getMyMarginAccounts_throwsWhenEmailDoesNotBelongToClient() {
+        when(clientRepository.findByEmail("employee@test.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> marginAccountService.getMyMarginAccounts("employee@test.com"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Only clients can view margin accounts.");
     }
 
     @Test

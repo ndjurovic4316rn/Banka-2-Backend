@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import rs.raf.banka2_bek.account.model.AccountStatus;
 import rs.raf.banka2_bek.account.repository.AccountRepository;
+import rs.raf.banka2_bek.client.repository.ClientRepository;
 import rs.raf.banka2_bek.margin.dto.CreateMarginAccountDto;
 import rs.raf.banka2_bek.margin.dto.MarginAccountDto;
 import rs.raf.banka2_bek.margin.dto.MarginTransactionDto;
@@ -41,6 +42,7 @@ public class MarginAccountService {
     private final MarginAccountRepository marginAccountRepository;
     private final MarginTransactionRepository marginTransactionRepository;
     private final AccountRepository accountRepository;
+    private final ClientRepository clientRepository;
 
     /** Podrazumevani procenat ucestva banke (50%) */
     private static final BigDecimal DEFAULT_BANK_PARTICIPATION = new BigDecimal("0.50");
@@ -129,18 +131,25 @@ public class MarginAccountService {
     /**
      * Vraca sve margin racune za autentifikovanog korisnika.
      *
-     * TODO: Implementirati logiku:
-     *   1. Pronaci korisnika po email-u (User ili Employee)
-     *   2. Dohvatiti sve margin racune za tog korisnika (findByUserId)
-     *   3. Mapirati u listu MarginAccountDto
-     *
      * @param email email autentifikovanog korisnika
      * @return lista margin racuna
      */
     public List<MarginAccountDto> getMyMarginAccounts(String email) {
-        // TODO: Look up user by email and fetch their margin accounts
-        log.info("Fetching margin accounts for user {}", email);
-        return List.of();
+        if (email == null || email.isBlank()) {
+            throw new IllegalStateException("Authenticated user is required.");
+        }
+
+        Long clientId = clientRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("Only clients can view margin accounts."))
+                .getId();
+
+        List<MarginAccountDto> accounts = marginAccountRepository.findByUserId(clientId)
+                .stream()
+                .map(this::toDto)
+                .toList();
+
+        log.info("Fetched {} margin accounts for client {}", accounts.size(), clientId);
+        return accounts;
     }
 
     /**

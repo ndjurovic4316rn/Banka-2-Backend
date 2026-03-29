@@ -59,11 +59,6 @@ public class MarginAccountController {
     /**
      * GET /margin-accounts/my
      * Vraca sve margin racune autentifikovanog korisnika.
-     *
-     * TODO: Implementirati:
-     *   1. Izvuci email iz Authentication objekta
-     *   2. Pozvati marginAccountService.getMyMarginAccounts(email)
-     *   3. Vratiti ResponseEntity.ok(lista)
      */
     @GetMapping("/my")
     public ResponseEntity<List<MarginAccountDto>> getMyMarginAccounts(Authentication authentication) {
