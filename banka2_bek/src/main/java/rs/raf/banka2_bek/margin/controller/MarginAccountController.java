@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import rs.raf.banka2_bek.client.repository.ClientRepository;
 import rs.raf.banka2_bek.margin.dto.CreateMarginAccountDto;
 import rs.raf.banka2_bek.margin.dto.MarginAccountDto;
 import rs.raf.banka2_bek.margin.dto.MarginTransactionDto;
@@ -33,22 +34,24 @@ import java.util.Map;
 public class MarginAccountController {
 
     private final MarginAccountService marginAccountService;
+    private final ClientRepository clientRepository;
 
     /**
      * POST /margin-accounts
      * Kreira novi margin racun za autentifikovanog korisnika.
-     *
-     * TODO: Implementirati:
-     *   1. Izvuci userId iz Authentication objekta (JWT claims)
-     *   2. Pozvati marginAccountService.createForUser(userId, dto)
-     *   3. Vratiti ResponseEntity.ok(marginAccountDto)
      */
     @PostMapping
     public ResponseEntity<MarginAccountDto> create(
             @Valid @RequestBody CreateMarginAccountDto dto,
             Authentication authentication) {
-        // Extract userId from authentication; using 0L as stub since JWT claims structure varies
-        Long userId = 0L; // TODO: Extract actual userId from JWT claims
+        String email = authentication != null ? authentication.getName() : null;
+        if (email == null || email.isBlank()) {
+            throw new IllegalStateException("Authenticated user is required.");
+        }
+        Long userId = clientRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("Only clients can create margin accounts."))
+                .getId();
+
         MarginAccountDto result = marginAccountService.createForUser(userId, dto);
         return ResponseEntity.ok(result);
     }
