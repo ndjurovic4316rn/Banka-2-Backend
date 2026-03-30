@@ -124,10 +124,10 @@ public class MarginAccountService {
      */
     @Transactional
     public void deposit(Long marginAccountId, BigDecimal amount, Authentication authentication) {
-        // TODO: Implement deposit logic with margin recalculation
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 1)
+            throw new IllegalArgumentException("Amount must be positive number.");
 
-        if (notClient(authentication))
-            throw new IllegalStateException("Access denied.");
+        if (notClient(authentication)) throw new IllegalStateException("Access denied.");
 
         User user = userRepository.findByEmail(authentication.getName()).orElseThrow(
                 () -> new EntityNotFoundException("Access denied.")
@@ -147,7 +147,6 @@ public class MarginAccountService {
 
         // 3. set new maintenanceMargin = initialMargin * MAINTENANCE_FACTOR
         marginAccount.setMaintenanceMargin(marginAccount.getInitialMargin().multiply(MAINTENANCE_FACTOR));
-
 
         // 4. if account could be unblocked -> activate it
         boolean isBlocked = marginAccount.getStatus().equals(MarginAccountStatus.BLOCKED);
@@ -191,11 +190,10 @@ public class MarginAccountService {
      */
     @Transactional
     public void withdraw(Long marginAccountId, BigDecimal amount, Authentication authentication) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 1)
+            throw new IllegalArgumentException("Amount must be positive number.");
 
-        // double check for client role (already checked in global security config)
-
-        if (notClient(authentication))
-            throw new IllegalStateException("Access denied.");
+        if (notClient(authentication)) throw new IllegalStateException("Access denied.");
 
         User user = userRepository.findByEmail(authentication.getName()).orElseThrow(
                 () -> new IllegalStateException("Access denied.")
@@ -227,6 +225,8 @@ public class MarginAccountService {
         // 4. update initialMargin = initialMargin - amount
         BigDecimal updatedInitialMargin = marginAccount.getInitialMargin().subtract(amount);
         marginAccount.setInitialMargin(updatedInitialMargin);
+
+        marginAccount.setMaintenanceMargin(marginAccount.getInitialMargin().multiply(MAINTENANCE_FACTOR));
 
         // 5. save margin account
         marginAccountRepository.save(marginAccount);
