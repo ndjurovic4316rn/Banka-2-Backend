@@ -5,7 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import rs.raf.banka2_bek.account.model.AccountStatus;
 import rs.raf.banka2_bek.account.repository.AccountRepository;
+import rs.raf.banka2_bek.client.repository.ClientRepository;
 import rs.raf.banka2_bek.margin.dto.CreateMarginAccountDto;
 import rs.raf.banka2_bek.margin.dto.MarginAccountDto;
 import rs.raf.banka2_bek.margin.dto.MarginTransactionDto;
@@ -17,6 +19,7 @@ import rs.raf.banka2_bek.margin.repository.MarginAccountRepository;
 import rs.raf.banka2_bek.margin.repository.MarginTransactionRepository;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 /**
@@ -39,6 +42,7 @@ public class MarginAccountService {
     private final MarginAccountRepository marginAccountRepository;
     private final MarginTransactionRepository marginTransactionRepository;
     private final AccountRepository accountRepository;
+    private final ClientRepository clientRepository;
 
     /** Podrazumevani procenat ucestva banke (50%) */
     private static final BigDecimal DEFAULT_BANK_PARTICIPATION = new BigDecimal("0.50");
@@ -49,48 +53,103 @@ public class MarginAccountService {
     /**
      * Kreira novi margin racun za korisnika.
      *
-     * TODO: Implementirati logiku:
-     *   1. Pronaci Account po accountId, baciti exception ako ne postoji
-     *   2. Proveriti da li korisnik (userId) ima pristup tom racunu
-     *   3. Izracunati:
-     *      - bankParticipation = DEFAULT_BANK_PARTICIPATION (0.50)
-     *      - initialMargin = initialDeposit / (1 - bankParticipation)
-     *        Npr. deposit=5000, bank=50% → initialMargin = 5000 / 0.5 = 10000
-     *      - loanValue = initialMargin - initialDeposit
-     *        Npr. loanValue = 10000 - 5000 = 5000
-     *      - maintenanceMargin = initialMargin * MAINTENANCE_FACTOR
-     *        Npr. maintenanceMargin = 10000 * 0.5 = 5000
-     *   4. Kreirati MarginAccount entitet sa svim izracunatim vrednostima
-     *   5. Sacuvati u bazu
-     *   6. Kreirati DEPOSIT MarginTransaction za pocetni depozit
-     *   7. Mapirati u MarginAccountDto i vratiti
-     *
      * @param userId ID korisnika koji kreira margin racun
      * @param dto DTO sa accountId i initialDeposit
      * @return kreiran MarginAccountDto
      */
     @Transactional
     public MarginAccountDto createForUser(Long userId, CreateMarginAccountDto dto) {
-        // TODO: Implement full account validation and fund transfer
-        log.info("Creating margin account for user {} with deposit {}", userId, dto.getInitialDeposit());
-        return new MarginAccountDto();
+        if (userId == null) {
+            throw new IllegalArgumentException("Authenticated user id is required.");
+        }
+        if (dto == null || dto.getAccountId() == null || dto.getInitialDeposit() == null) {
+            throw new IllegalArgumentException("Account id and initial deposit are required.");
+        }
+
+        BigDecimal initialDeposit = dto.getInitialDeposit();
+        if (initialDeposit.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Initial deposit must be greater than zero.");
+        }
+
+        var account = accountRepository.findForUpdateById(dto.getAccountId())
+                .orElseThrow(() -> new IllegalArgumentException("Account not found."));
+
+        if (account.getClient() == null || !userId.equals(account.getClient().getId())) {
+            throw new IllegalStateException("You are not allowed to create a margin account for this base account.");
+        }
+        if (account.getStatus() != AccountStatus.ACTIVE) {
+            throw new IllegalArgumentException("Base account must be active.");
+        }
+        if (!marginAccountRepository.findByAccountId(account.getId()).isEmpty()) {
+            throw new IllegalArgumentException("Margin account already exists for this base account.");
+        }
+
+        BigDecimal availableBalance = account.getAvailableBalance() == null
+                ? BigDecimal.ZERO
+                : account.getAvailableBalance();
+        if (availableBalance.compareTo(initialDeposit) < 0) {
+            throw new IllegalArgumentException("Insufficient available balance for initial margin deposit.");
+        }
+
+        BigDecimal divisor = BigDecimal.ONE.subtract(DEFAULT_BANK_PARTICIPATION);
+        BigDecimal initialMargin = initialDeposit.divide(divisor, 4, RoundingMode.HALF_UP);
+        BigDecimal loanValue = initialMargin.subtract(initialDeposit).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal maintenanceMargin = initialMargin.multiply(MAINTENANCE_FACTOR).setScale(4, RoundingMode.HALF_UP);
+
+        account.setAvailableBalance(availableBalance.subtract(initialDeposit));
+        if (account.getBalance() != null) {
+            account.setBalance(account.getBalance().subtract(initialDeposit));
+        }
+
+        MarginAccount savedMarginAccount = marginAccountRepository.save(
+                MarginAccount.builder()
+                        .account(account)
+                        .userId(userId)
+                        .initialMargin(initialMargin)
+                        .loanValue(loanValue)
+                        .maintenanceMargin(maintenanceMargin)
+                        .bankParticipation(DEFAULT_BANK_PARTICIPATION)
+                        .status(MarginAccountStatus.ACTIVE)
+                        .build()
+        );
+
+        marginTransactionRepository.save(
+                MarginTransaction.builder()
+                        .marginAccount(savedMarginAccount)
+                        .type(MarginTransactionType.DEPOSIT)
+                        .amount(initialDeposit.setScale(4, RoundingMode.HALF_UP))
+                        .description("Initial margin deposit")
+                        .build()
+        );
+
+        log.info("Created margin account {} for user {} on base account {}",
+                savedMarginAccount.getId(), userId, account.getId());
+
+        return toDto(savedMarginAccount);
     }
 
     /**
      * Vraca sve margin racune za autentifikovanog korisnika.
      *
-     * TODO: Implementirati logiku:
-     *   1. Pronaci korisnika po email-u (User ili Employee)
-     *   2. Dohvatiti sve margin racune za tog korisnika (findByUserId)
-     *   3. Mapirati u listu MarginAccountDto
-     *
      * @param email email autentifikovanog korisnika
      * @return lista margin racuna
      */
     public List<MarginAccountDto> getMyMarginAccounts(String email) {
-        // TODO: Look up user by email and fetch their margin accounts
-        log.info("Fetching margin accounts for user {}", email);
-        return List.of();
+        if (email == null || email.isBlank()) {
+            throw new IllegalStateException("Authenticated user is required.");
+        }
+
+        Long clientId = clientRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("Only clients can view margin accounts."))
+                .getId();
+
+        List<MarginAccountDto> accounts = marginAccountRepository.findByUserId(clientId)
+                .stream()
+                .map(this::toDto)
+                .toList();
+
+        log.info("Fetched {} margin accounts for client {}", accounts.size(), clientId);
+        return accounts;
     }
 
     /**
