@@ -336,13 +336,20 @@ VALUES
 
     INSERT INTO margin_accounts (account_id, user_id, initial_margin, loan_value, maintenance_margin, bank_participation, status, created_at)
 
-    VALUES
-        -- Stefan Jovanovic (id = 1) 4. racun - margin
+    SELECT a.id,
+           u.id,
+           30000.0000, 15000.0000,
+           15000.0000, 0.5000, 'ACTIVE', NOW()
 
-        (1, 1, 30000.0000, 15000.0000,
-        15000.0000, 0.5000, 'ACTIVE', NOW())
+    FROM accounts a
+             JOIN users u ON u.email = 'stefan.jovanovic@gmail.com'
 
-    ON DUPLICATE KEY UPDATE account_id = account_id;
+    WHERE a.account_number = '222000112345678911'
+
+      AND NOT EXISTS (
+
+        SELECT 1 FROM margin_accounts ma WHERE ma.account_id = a.id
+    );
 
 -- ============================================================
 -- BANK ACCOUNTS (Banka kao entitet — racuni u svim valutama)
