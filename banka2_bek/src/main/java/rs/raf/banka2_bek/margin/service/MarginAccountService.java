@@ -297,7 +297,7 @@ public class MarginAccountService {
         );
 
         // CHECK ACCOUNT OWNERSHIP
-        if(!marginAccount.getUserId().equals(user.getId())) throw  new IllegalStateException("Access denied.");
+        if (!marginAccount.getUserId().equals(user.getId())) throw new IllegalStateException("Access denied.");
 
         return marginTransactionRepository.findByMarginAccountIdOrderByCreatedAtDesc(marginAccountId)
                 .stream()
