@@ -540,6 +540,185 @@ class MarginAccountControllerIntegrationTest {
                 .build());
     }
 
+    // ── withdraw() integration tests ───────────────────────────────────────────
+
+    @Test
+    void withdraw_returnsOK_andUpdatesMarginAccountValues() {
+        Client client = createClient("withdraw.client@test.com");
+        User user = createAuthUser(client.getEmail(), "CLIENT");
+        Employee employee = createEmployee("withdraw.emp@test.com", "wit.emp");
+        Currency rsd = createCurrency("RSD", "Serbian Dinar", "RSD", "RS");
+        Account account = createAccount("777777777777777801", client, employee, rsd,
+                new BigDecimal("10000.00"), new BigDecimal("10000.00"));
+        MarginAccount marginAccount = createMarginAccount(account, client,
+                MarginAccountStatus.ACTIVE, new BigDecimal("10000.0000"), new BigDecimal("5000.0000"));
+
+        String payload = """
+                { "amount": 2000.00 }
+                """;
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url("/margin-accounts/" + marginAccount.getId() + "/withdraw"),
+                new HttpEntity<>(payload, jsonHeaders(jwtService.generateAccessToken(user))),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        entityManager.clear();
+        MarginAccount updated = marginAccountRepository.findById(marginAccount.getId()).orElseThrow();
+        assertThat(updated.getInitialMargin()).isEqualByComparingTo("8000.0000");
+        assertThat(updated.getMaintenanceMargin()).isEqualByComparingTo("4000.0000");
+        assertThat(marginTransactionRepository.count()).isEqualTo(1L);
+        assertThat(marginTransactionRepository.findAll().get(0).getType()).isEqualTo(MarginTransactionType.WITHDRAWAL);
+    }
+
+    @Test
+    void withdraw_returnsForbidden_whenMissingJwt() {
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url("/margin-accounts/1/withdraw"),
+                new HttpEntity<>("{\"amount\":100}", jsonHeaders(null)),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void withdraw_returnsForbidden_forNonClientUser() {
+        User nonClient = createAuthUser("withdraw.nonclient@test.com", "EMPLOYEE");
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url("/margin-accounts/1/withdraw"),
+                new HttpEntity<>("{\"amount\":100}", jsonHeaders(jwtService.generateAccessToken(nonClient))),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void withdraw_returnsNotFound_whenMarginAccountNotFound() {
+        Client client = createClient("withdraw.notfound@test.com");
+        User user = createAuthUser(client.getEmail(), "CLIENT");
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url("/margin-accounts/99999/withdraw"),
+                new HttpEntity<>("{\"amount\":100}", jsonHeaders(jwtService.generateAccessToken(user))),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).contains("99999");
+    }
+
+    @Test
+    void withdraw_returnsForbidden_whenCallerIsNotOwner() {
+        Client owner = createClient("withdraw.owner@test.com");
+        Client attacker = createClient("withdraw.attacker@test.com");
+        User attackerUser = createAuthUser(attacker.getEmail(), "CLIENT");
+        Employee employee = createEmployee("withdraw.own.emp@test.com", "wit.own.emp");
+        Currency rsd = createCurrency("RSD", "Serbian Dinar", "RSD", "RS");
+        Account account = createAccount("777777777777777802", owner, employee, rsd,
+                new BigDecimal("10000.00"), new BigDecimal("10000.00"));
+        MarginAccount marginAccount = createMarginAccount(account, owner,
+                MarginAccountStatus.ACTIVE, new BigDecimal("10000.0000"), new BigDecimal("5000.0000"));
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url("/margin-accounts/" + marginAccount.getId() + "/withdraw"),
+                new HttpEntity<>("{\"amount\":100}", jsonHeaders(jwtService.generateAccessToken(attackerUser))),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("You don't have access to this margin account.");
+    }
+
+    @Test
+    void withdraw_returnsBadRequest_whenAmountIsZero() {
+        Client client = createClient("withdraw.zero@test.com");
+        User user = createAuthUser(client.getEmail(), "CLIENT");
+        Employee employee = createEmployee("withdraw.zero.emp@test.com", "wit.zero.emp");
+        Currency rsd = createCurrency("RSD", "Serbian Dinar", "RSD", "RS");
+        Account account = createAccount("777777777777777803", client, employee, rsd,
+                new BigDecimal("10000.00"), new BigDecimal("10000.00"));
+        MarginAccount marginAccount = createMarginAccount(account, client,
+                MarginAccountStatus.ACTIVE, new BigDecimal("10000.0000"), new BigDecimal("5000.0000"));
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url("/margin-accounts/" + marginAccount.getId() + "/withdraw"),
+                new HttpEntity<>("{\"amount\":0}", jsonHeaders(jwtService.generateAccessToken(user))),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).contains("Amount must be positive number.");
+    }
+
+    @Test
+    void withdraw_returnsBadRequest_whenAmountIsMissing() {
+        Client client = createClient("withdraw.missing@test.com");
+        User user = createAuthUser(client.getEmail(), "CLIENT");
+        Employee employee = createEmployee("withdraw.miss.emp@test.com", "wit.miss.emp");
+        Currency rsd = createCurrency("RSD", "Serbian Dinar", "RSD", "RS");
+        Account account = createAccount("777777777777777804", client, employee, rsd,
+                new BigDecimal("10000.00"), new BigDecimal("10000.00"));
+        MarginAccount marginAccount = createMarginAccount(account, client,
+                MarginAccountStatus.ACTIVE, new BigDecimal("10000.0000"), new BigDecimal("5000.0000"));
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url("/margin-accounts/" + marginAccount.getId() + "/withdraw"),
+                new HttpEntity<>("{}", jsonHeaders(jwtService.generateAccessToken(user))),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).contains("Amount must be positive number.");
+    }
+
+    @Test
+    void withdraw_returnsForbidden_whenAccountIsBlocked() {
+        Client client = createClient("withdraw.blocked@test.com");
+        User user = createAuthUser(client.getEmail(), "CLIENT");
+        Employee employee = createEmployee("withdraw.blocked.emp@test.com", "wit.bl.emp");
+        Currency rsd = createCurrency("RSD", "Serbian Dinar", "RSD", "RS");
+        Account account = createAccount("777777777777777805", client, employee, rsd,
+                new BigDecimal("10000.00"), new BigDecimal("10000.00"));
+        MarginAccount marginAccount = createMarginAccount(account, client,
+                MarginAccountStatus.BLOCKED, new BigDecimal("10000.0000"), new BigDecimal("5000.0000"));
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url("/margin-accounts/" + marginAccount.getId() + "/withdraw"),
+                new HttpEntity<>("{\"amount\":100}", jsonHeaders(jwtService.generateAccessToken(user))),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("is not active");
+    }
+
+    @Test
+    void withdraw_returnsBadRequest_whenWithdrawalDropsBelowMaintenanceMargin() {
+        Client client = createClient("withdraw.maintenance@test.com");
+        User user = createAuthUser(client.getEmail(), "CLIENT");
+        Employee employee = createEmployee("withdraw.maint.emp@test.com", "wit.maint.emp");
+        Currency rsd = createCurrency("RSD", "Serbian Dinar", "RSD", "RS");
+        Account account = createAccount("777777777777777806", client, employee, rsd,
+                new BigDecimal("10000.00"), new BigDecimal("10000.00"));
+        MarginAccount marginAccount = createMarginAccount(account, client,
+                MarginAccountStatus.ACTIVE, new BigDecimal("10000.0000"), new BigDecimal("5000.0000"));
+
+        // 10000 - 6000 = 4000 < 5000 (maintenanceMargin)
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url("/margin-accounts/" + marginAccount.getId() + "/withdraw"),
+                new HttpEntity<>("{\"amount\":6000}", jsonHeaders(jwtService.generateAccessToken(user))),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).contains("Funds in the account cannot be below");
+    }
+
     private MarginAccount createMarginAccount(Account account, Client client,
                                               MarginAccountStatus status,
                                               BigDecimal initialMargin,

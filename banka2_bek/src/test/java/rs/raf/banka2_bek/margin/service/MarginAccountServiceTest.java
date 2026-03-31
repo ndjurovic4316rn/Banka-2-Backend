@@ -350,6 +350,142 @@ class MarginAccountServiceTest {
                 .hasMessage("You don't have access to this margin account.");
     }
 
+    // ── withdraw() tests ───────────────────────────────────────────────────────
+
+    @Test
+    void withdraw_success_decreasesInitialMarginAndRecalculatesMaintenanceMargin() {
+        Authentication auth = authenticatedAs("client@test.com");
+        Client client = Client.builder().id(10L).email("client@test.com").build();
+        MarginAccount account = activeMarginAccount(10L, "10000", "5000", MarginAccountStatus.ACTIVE);
+
+        when(clientRepository.findByEmail("client@test.com")).thenReturn(Optional.of(client));
+        when(marginAccountRepository.findById(1L)).thenReturn(Optional.of(account));
+
+        marginAccountService.withdraw(1L, new BigDecimal("2000"), auth);
+
+        assertThat(account.getInitialMargin()).isEqualByComparingTo("8000");
+        assertThat(account.getMaintenanceMargin()).isEqualByComparingTo("4000");
+
+        verify(marginAccountRepository).save(account);
+
+        ArgumentCaptor<MarginTransaction> txCaptor = ArgumentCaptor.forClass(MarginTransaction.class);
+        verify(marginTransactionRepository).save(txCaptor.capture());
+        assertThat(txCaptor.getValue().getType()).isEqualTo(MarginTransactionType.WITHDRAWAL);
+        assertThat(txCaptor.getValue().getAmount()).isEqualByComparingTo("2000");
+    }
+
+    @Test
+    void withdraw_throwsWhenAuthenticationIsNull() {
+        assertThatThrownBy(() -> marginAccountService.withdraw(1L, new BigDecimal("100"), null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Not authenticated.");
+    }
+
+    @Test
+    void withdraw_throwsWhenNotAuthenticated() {
+        Authentication auth = mock(Authentication.class);
+        when(auth.isAuthenticated()).thenReturn(false);
+
+        assertThatThrownBy(() -> marginAccountService.withdraw(1L, new BigDecimal("100"), auth))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Not authenticated.");
+    }
+
+    @Test
+    void withdraw_throwsWhenAmountIsNull() {
+        Authentication auth = mock(Authentication.class);
+        when(auth.isAuthenticated()).thenReturn(true);
+
+        assertThatThrownBy(() -> marginAccountService.withdraw(1L, null, auth))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Amount must be positive number.");
+    }
+
+    @Test
+    void withdraw_throwsWhenAmountIsZero() {
+        Authentication auth = mock(Authentication.class);
+        when(auth.isAuthenticated()).thenReturn(true);
+
+        assertThatThrownBy(() -> marginAccountService.withdraw(1L, BigDecimal.ZERO, auth))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Amount must be positive number.");
+    }
+
+    @Test
+    void withdraw_throwsWhenAmountIsNegative() {
+        Authentication auth = mock(Authentication.class);
+        when(auth.isAuthenticated()).thenReturn(true);
+
+        assertThatThrownBy(() -> marginAccountService.withdraw(1L, new BigDecimal("-100"), auth))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Amount must be positive number.");
+    }
+
+    @Test
+    void withdraw_throwsWhenClientNotFound() {
+        Authentication auth = authenticatedAs("unknown@test.com");
+        when(clientRepository.findByEmail("unknown@test.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> marginAccountService.withdraw(1L, new BigDecimal("100"), auth))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Only clients can withdraw");
+    }
+
+    @Test
+    void withdraw_throwsWhenMarginAccountNotFound() {
+        Authentication auth = authenticatedAs("client@test.com");
+        Client client = Client.builder().id(10L).email("client@test.com").build();
+        when(clientRepository.findByEmail("client@test.com")).thenReturn(Optional.of(client));
+        when(marginAccountRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> marginAccountService.withdraw(99L, new BigDecimal("100"), auth))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining("99");
+    }
+
+    @Test
+    void withdraw_throwsWhenCallerIsNotOwner() {
+        Authentication auth = authenticatedAs("attacker@test.com");
+        Client attacker = Client.builder().id(20L).email("attacker@test.com").build();
+        MarginAccount account = activeMarginAccount(10L, "10000", "5000", MarginAccountStatus.ACTIVE);
+
+        when(clientRepository.findByEmail("attacker@test.com")).thenReturn(Optional.of(attacker));
+        when(marginAccountRepository.findById(1L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> marginAccountService.withdraw(1L, new BigDecimal("100"), auth))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("You don't have access to this margin account.");
+    }
+
+    @Test
+    void withdraw_throwsWhenAccountIsNotActive() {
+        Authentication auth = authenticatedAs("client@test.com");
+        Client client = Client.builder().id(10L).email("client@test.com").build();
+        MarginAccount account = activeMarginAccount(10L, "10000", "5000", MarginAccountStatus.BLOCKED);
+
+        when(clientRepository.findByEmail("client@test.com")).thenReturn(Optional.of(client));
+        when(marginAccountRepository.findById(1L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> marginAccountService.withdraw(1L, new BigDecimal("100"), auth))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("is not active");
+    }
+
+    @Test
+    void withdraw_throwsWhenWithdrawalWouldDropBelowMaintenanceMargin() {
+        Authentication auth = authenticatedAs("client@test.com");
+        Client client = Client.builder().id(10L).email("client@test.com").build();
+        MarginAccount account = activeMarginAccount(10L, "10000", "5000", MarginAccountStatus.ACTIVE);
+
+        when(clientRepository.findByEmail("client@test.com")).thenReturn(Optional.of(client));
+        when(marginAccountRepository.findById(1L)).thenReturn(Optional.of(account));
+
+        // 10000 - 6000 = 4000 < 5000 (maintenanceMargin)
+        assertThatThrownBy(() -> marginAccountService.withdraw(1L, new BigDecimal("6000"), auth))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Funds in the account cannot be below");
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private Account activeAccount(Long accountId, Long clientId, String available, String balance) {
