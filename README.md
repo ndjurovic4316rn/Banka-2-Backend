@@ -1,7 +1,7 @@
 # Banka 2025 - Tim 2 | Backend
 
 Spring Boot backend aplikacija za simulaciju bankarskog sistema. Projekat za predmet Softversko Inzenjerstvo na Racunarskom fakultetu, 2025/26.
-// da li je raketa ovo napravio kako treba, i sigurno je on kriv za sve a ne ja
+// da li je raketa ovo napravio kako treba, i sigurno je on kriv za sve a ne ja testiram da li radi ovo bre
 ## Tech Stack
 
 - **Java 17** + **Spring Boot 4.0.4**
