@@ -57,6 +57,19 @@ ON DUPLICATE KEY UPDATE email = email;
 
 INSERT INTO employees (first_name, last_name, date_of_birth, gender, email, phone, address, username, password, salt_password, position, department, active)
 VALUES
+  -- Admini (takodje zaposleni - "svaki admin je i supervizor")
+  ('Marko', 'Petrović', '1985-05-20', 'M', 'marko.petrovic@banka.rs',
+   '+381 63 111 2233', 'Knez Mihailova 15, Beograd', 'marko.petrovic',
+   '$2b$10$YdFawauXoIBNqlhpBkFpKuDeMqGXlFR6g6T.sj3yXVFOdFDSmZzPG',
+   'c2VlZF9zYWx0X2FkbTFfXw==',
+   'Direktor', 'Uprava', 1),
+
+  ('Jelena', 'Đorđević', '1987-11-12', 'F', 'jelena.djordjevic@banka.rs',
+   '+381 63 222 3344', 'Bulevar Kralja Aleksandra 73, Beograd', 'jelena.djordjevic',
+   '$2b$10$YdFawauXoIBNqlhpBkFpKuDeMqGXlFR6g6T.sj3yXVFOdFDSmZzPG',
+   'c2VlZF9zYWx0X2FkbTJfXw==',
+   'Zamenik direktora', 'Uprava', 1),
+
   ('Nikola', 'Milenković', '1988-03-15', 'M', 'nikola.milenkovic@banka.rs',
    '+381 63 100 2000', 'Nemanjina 4, Beograd', 'nikola.milenkovic',
    '$2b$10$lqAByD7N8elcbkNzut14L.dsZTHrWGL5r3qrp9KvzPw58.AzE4eHG',
@@ -105,6 +118,42 @@ ON DUPLICATE KEY UPDATE code = code;
 -- ============================================================
 -- EMPLOYEE PERMISSIONS
 -- ============================================================
+
+-- Marko Petrović — Direktor / Admin (sve permisije)
+INSERT INTO employee_permissions (employee_id, permission)
+SELECT e.id, p.permission
+FROM employees e
+CROSS JOIN (
+  SELECT 'ADMIN' AS permission UNION ALL
+  SELECT 'TRADE_STOCKS' UNION ALL
+  SELECT 'VIEW_STOCKS' UNION ALL
+  SELECT 'CREATE_CONTRACTS' UNION ALL
+  SELECT 'CREATE_INSURANCE' UNION ALL
+  SELECT 'SUPERVISOR' UNION ALL
+  SELECT 'AGENT'
+) p
+WHERE e.email = 'marko.petrovic@banka.rs'
+AND NOT EXISTS (
+  SELECT 1 FROM employee_permissions ep WHERE ep.employee_id = e.id AND ep.permission = p.permission
+);
+
+-- Jelena Đorđević — Zamenik / Admin (sve permisije)
+INSERT INTO employee_permissions (employee_id, permission)
+SELECT e.id, p.permission
+FROM employees e
+CROSS JOIN (
+  SELECT 'ADMIN' AS permission UNION ALL
+  SELECT 'TRADE_STOCKS' UNION ALL
+  SELECT 'VIEW_STOCKS' UNION ALL
+  SELECT 'CREATE_CONTRACTS' UNION ALL
+  SELECT 'CREATE_INSURANCE' UNION ALL
+  SELECT 'SUPERVISOR' UNION ALL
+  SELECT 'AGENT'
+) p
+WHERE e.email = 'jelena.djordjevic@banka.rs'
+AND NOT EXISTS (
+  SELECT 1 FROM employee_permissions ep WHERE ep.employee_id = e.id AND ep.permission = p.permission
+);
 
 -- Nikola Milenković — Team Lead (sve permisije)
 INSERT INTO employee_permissions (employee_id, permission)
@@ -1927,12 +1976,21 @@ WHERE ticker IN (
 -- CELINA 3: Dodatni podaci - Aktuari, Orderi, Margin, Porez
 -- ============================================================
 
--- Dodaj vise agenata (Djordje=agent, Maja=agent)
--- employee_id 3 = Djordje, employee_id 4 = Maja
+-- Admini su supervizori (svaki admin = supervizor po specifikaciji)
+-- employee_id: 1=Marko, 2=Jelena (novi), 3=Nikola, 4=Tamara, 5=Djordje, 6=Maja, 7=Vuk
+-- Marko (employee 1) i Jelena (employee 2) dodati kao supervizori
 INSERT IGNORE INTO actuary_info (actuary_type, daily_limit, need_approval, used_limit, employee_id)
-VALUES
-    ('AGENT', 150000.00, 0, 25000.00, 3),
-    ('AGENT', 200000.00, 1, 180000.00, 4);
+SELECT 'SUPERVISOR', NULL, 0, 0.00, id FROM employees WHERE email = 'marko.petrovic@banka.rs';
+
+INSERT IGNORE INTO actuary_info (actuary_type, daily_limit, need_approval, used_limit, employee_id)
+SELECT 'SUPERVISOR', NULL, 0, 0.00, id FROM employees WHERE email = 'jelena.djordjevic@banka.rs';
+
+-- Dodaj vise agenata (Djordje=agent, Maja=agent)
+INSERT IGNORE INTO actuary_info (actuary_type, daily_limit, need_approval, used_limit, employee_id)
+SELECT 'AGENT', 150000.00, 0, 25000.00, id FROM employees WHERE email = 'djordje.jankovic@banka.rs';
+
+INSERT IGNORE INTO actuary_info (actuary_type, daily_limit, need_approval, used_limit, employee_id)
+SELECT 'AGENT', 200000.00, 1, 180000.00, id FROM employees WHERE email = 'maja.ristic@banka.rs';
 
 -- ============================================================
 -- ORDERS (sample nalozi za prikaz)
