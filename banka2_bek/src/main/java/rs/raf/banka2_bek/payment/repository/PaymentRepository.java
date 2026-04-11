@@ -17,13 +17,6 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
            select p from Payment p
            where (p.fromAccount.client.id = :clientId
                   or p.toAccountNumber in (select a.accountNumber from Account a where a.client.id = :clientId))
-           """)
-    Page<Payment> findByUserAccounts(@Param("clientId") Long clientId, Pageable pageable);
-
-    @Query("""
-           select p from Payment p
-           where (p.fromAccount.client.id = :clientId
-                  or p.toAccountNumber in (select a.accountNumber from Account a where a.client.id = :clientId))
              and (:fromDate is null or p.createdAt >= :fromDate)
              and (:toDate is null or p.createdAt <= :toDate)
              and (:accountNumber is null or p.fromAccount.accountNumber = :accountNumber or p.toAccountNumber = :accountNumber)

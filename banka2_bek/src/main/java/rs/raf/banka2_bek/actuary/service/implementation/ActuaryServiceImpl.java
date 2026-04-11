@@ -2,7 +2,6 @@ package rs.raf.banka2_bek.actuary.service.implementation;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,10 +14,6 @@ import rs.raf.banka2_bek.actuary.model.ActuaryInfo;
 import rs.raf.banka2_bek.actuary.model.ActuaryType;
 import rs.raf.banka2_bek.actuary.repository.ActuaryInfoRepository;
 import rs.raf.banka2_bek.actuary.service.ActuaryService;
-import rs.raf.banka2_bek.auth.model.User;
-import rs.raf.banka2_bek.auth.repository.UserRepository;
-import rs.raf.banka2_bek.employee.model.Employee;
-import rs.raf.banka2_bek.employee.repository.EmployeeRepository;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -29,8 +24,6 @@ import java.util.stream.Collectors;
 public class ActuaryServiceImpl implements ActuaryService {
 
     private final ActuaryInfoRepository actuaryInfoRepository;
-    private final EmployeeRepository employeeRepository;
-    private final UserRepository userRepository;
 
     @Override
     public List<ActuaryInfoDto> getAgents(String email, String firstName, String lastName, String position) {
@@ -111,70 +104,6 @@ public class ActuaryServiceImpl implements ActuaryService {
         for (ActuaryInfo agent : agents) {
             resetUsedLimit(agent.getEmployee().getId());
         }
-    }
-
-    @Scheduled(cron = "0 59 23 * * *")
-    @Transactional
-    public void scheduledResetAllUsedLimits() {
-        resetAllUsedLimits();
-    }
-
-    private ActuaryInfo getAgentActuaryInfo(Long employeeId) {
-        ActuaryInfo info = actuaryInfoRepository.findByEmployeeId(employeeId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Actuary info for employee with ID " + employeeId + " not found."
-                ));
-
-        if (info.getActuaryType() != ActuaryType.AGENT) {
-            throw new IllegalStateException("Only AGENT actuaries can be modified.");
-        }
-
-        return info;
-    }
-
-    private void ensureSupervisorOrAdmin() {
-        String email = getAuthenticatedEmail();
-
-        User user = userRepository.findByEmail(email).orElse(null);
-        if (user != null && "ADMIN".equalsIgnoreCase(user.getRole()) && user.isActive()) {
-            return;
-        }
-
-        Employee employee = employeeRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Authenticated employee not found."));
-
-        if (!Boolean.TRUE.equals(employee.getActive())) {
-            throw new IllegalStateException("Authenticated employee is not active.");
-        }
-
-        if (employee.getPermissions() != null && employee.getPermissions().contains("ADMIN")) {
-            return;
-        }
-
-        boolean hasSupervisorPermission = employee.getPermissions() != null
-                && employee.getPermissions().contains("SUPERVISOR");
-
-        boolean hasSupervisorActuaryType = actuaryInfoRepository.findByEmployeeId(employee.getId())
-                .map(info -> info.getActuaryType() == ActuaryType.SUPERVISOR)
-                .orElse(false);
-
-        if (!hasSupervisorPermission && !hasSupervisorActuaryType) {
-            throw new IllegalStateException("Only supervisors or admins can perform this action.");
-        }
-    }
-
-    private String getAuthenticatedEmail() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new IllegalStateException("User is not authenticated.");
-        }
-
-        String email = authentication.getName();
-        if (email == null || email.isBlank()) {
-            throw new IllegalStateException("Unable to determine authenticated user email.");
-        }
-
-        return email;
     }
 
     private String getAuthenticatedUsername() {

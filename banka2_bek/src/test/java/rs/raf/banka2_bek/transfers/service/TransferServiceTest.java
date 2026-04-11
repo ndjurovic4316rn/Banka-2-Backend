@@ -17,7 +17,7 @@ import rs.raf.banka2_bek.currency.model.Currency;
 import rs.raf.banka2_bek.exchange.ExchangeService;
 import rs.raf.banka2_bek.exchange.dto.CalculateExchangeResponseDto;
 import rs.raf.banka2_bek.payment.model.PaymentStatus;
-import rs.raf.banka2_bek.transfer.model.Transfer;
+import rs.raf.banka2_bek.transfers.model.Transfer;
 import rs.raf.banka2_bek.transfers.dto.TransferFxRequestDto;
 import rs.raf.banka2_bek.transfers.dto.TransferInternalRequestDto;
 import rs.raf.banka2_bek.transfers.dto.TransferResponseDto;
@@ -389,7 +389,7 @@ public class TransferServiceTest {
         when(transferRepository.findByCreatedByOrderByCreatedAtDesc(client))
                 .thenReturn(List.of(transfer1, transfer2));
 
-        List<TransferResponseDto> result = transferService.getAllTransfers(client);
+        List<TransferResponseDto> result = transferService.getAllTransfers(client, null, null, null);
 
         assertThat(result.size()).isEqualTo(2);
         assertThat(result.get(0).getStatus()).isEqualTo(PaymentStatus.COMPLETED);

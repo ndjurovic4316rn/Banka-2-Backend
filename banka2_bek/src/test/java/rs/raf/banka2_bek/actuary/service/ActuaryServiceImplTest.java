@@ -1,17 +1,7 @@
 package rs.raf.banka2_bek.actuary.service;
 
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import rs.raf.banka2_bek.actuary.dto.ActuaryInfoDto;
-import rs.raf.banka2_bek.actuary.dto.UpdateActuaryLimitDto;
-import rs.raf.banka2_bek.actuary.model.ActuaryInfo;
-import rs.raf.banka2_bek.actuary.model.ActuaryType;
-import rs.raf.banka2_bek.actuary.repository.ActuaryInfoRepository;
-import rs.raf.banka2_bek.actuary.service.implementation.ActuaryServiceImpl;
-import rs.raf.banka2_bek.employee.model.Employee;
-
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -21,20 +11,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-
+import org.springframework.security.core.userdetails.UserDetails;
 import rs.raf.banka2_bek.actuary.dto.ActuaryInfoDto;
 import rs.raf.banka2_bek.actuary.dto.UpdateActuaryLimitDto;
 import rs.raf.banka2_bek.actuary.model.ActuaryInfo;
 import rs.raf.banka2_bek.actuary.model.ActuaryType;
 import rs.raf.banka2_bek.actuary.repository.ActuaryInfoRepository;
 import rs.raf.banka2_bek.actuary.service.implementation.ActuaryServiceImpl;
-import rs.raf.banka2_bek.auth.model.User;
-import rs.raf.banka2_bek.auth.repository.UserRepository;
 import rs.raf.banka2_bek.employee.model.Employee;
-import rs.raf.banka2_bek.employee.repository.EmployeeRepository;
-
-import org.springframework.security.core.userdetails.UserDetails;
-
 
 import java.math.BigDecimal;
 import java.util.Collections;
@@ -45,7 +29,6 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,12 +37,6 @@ class ActuaryServiceImplTest {
     @Mock
     private ActuaryInfoRepository actuaryInfoRepository;
 
-    @Mock
-    private EmployeeRepository employeeRepository;
-
-    @Mock
-    private UserRepository userRepository;
-
     @InjectMocks
     private ActuaryServiceImpl actuaryService;
 
@@ -67,12 +44,6 @@ class ActuaryServiceImplTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
-    }
-
-    private void authenticateAs(String email) {
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(email, null, List.of())
-        );
     }
 
     private Employee mockEmployee;
@@ -118,17 +89,6 @@ class ActuaryServiceImplTest {
                 .permissions(Set.of())
                 .build();
         return emp;
-    }
-
-    private User createAdminUser(String email) {
-        User admin = new User();
-        admin.setEmail(email);
-        admin.setPassword("pass");
-        admin.setFirstName("Admin");
-        admin.setLastName("User");
-        admin.setActive(true);
-        admin.setRole("ADMIN");
-        return admin;
     }
 
     private ActuaryInfo createAgentInfo(Long id, Employee employee,
@@ -483,64 +443,6 @@ class ActuaryServiceImplTest {
             verify(actuaryInfoRepository).findAllByActuaryType(ActuaryType.AGENT);
             verify(actuaryInfoRepository, never()).findByEmployeeId(anyLong());
         }
-    }
-
-    @Nested
-    @DisplayName("scheduledResetAllUsedLimits")
-    class ScheduledResetAllUsedLimits {
-
-        @Test
-        @DisplayName("scheduled wrapper poziva business reset metodu")
-        void scheduledMethodCallsBusinessLogic() {
-            ActuaryServiceImpl serviceSpy = spy(actuaryService);
-
-            serviceSpy.scheduledResetAllUsedLimits();
-
-            verify(serviceSpy).resetAllUsedLimits();
-        }
-        @Test
-        @DisplayName("Treba resetovati limit kada je zaposleni AGENT")
-        void resetUsedLimit_Success() {
-            mockActuaryInfo.setActuaryType(ActuaryType.AGENT);
-
-            when(actuaryInfoRepository.findByEmployeeId(RESET_EMPLOYEE_ID))
-                    .thenReturn(Optional.of(mockActuaryInfo));
-            when(actuaryInfoRepository.save(any(ActuaryInfo.class)))
-                    .thenAnswer(invocation -> invocation.getArgument(0));
-
-            ActuaryInfoDto result = actuaryService.resetUsedLimit(RESET_EMPLOYEE_ID);
-
-            assertEquals(BigDecimal.ZERO, result.getUsedLimit());
-            assertEquals("AGENT", result.getActuaryType());
-            assertEquals("Luka Draskovic", result.getEmployeeName());
-            verify(actuaryInfoRepository, times(1)).save(any(ActuaryInfo.class));
-        }
-
-        @Test
-        @DisplayName("Treba baciti EntityNotFoundException kada zaposleni ne postoji")
-        void resetUsedLimit_NotFound() {
-            when(actuaryInfoRepository.findByEmployeeId(RESET_EMPLOYEE_ID))
-                    .thenReturn(Optional.empty());
-
-            assertThrows(jakarta.persistence.EntityNotFoundException.class,
-                    () -> actuaryService.resetUsedLimit(RESET_EMPLOYEE_ID));
-            verify(actuaryInfoRepository, never()).save(any());
-        }
-
-        @Test
-        @DisplayName("Treba baciti IllegalStateException kada se pokušava reset supervizora")
-        void resetUsedLimit_FailForSupervisor() {
-            mockActuaryInfo.setActuaryType(ActuaryType.SUPERVISOR);
-            when(actuaryInfoRepository.findByEmployeeId(RESET_EMPLOYEE_ID))
-                    .thenReturn(Optional.of(mockActuaryInfo));
-
-            IllegalStateException exception = assertThrows(IllegalStateException.class,
-                    () -> actuaryService.resetUsedLimit(RESET_EMPLOYEE_ID));
-
-            assertTrue(exception.getMessage().contains("only allowed for Agents"));
-            verify(actuaryInfoRepository, never()).save(any());
-        }
-
     }
 
     @Nested

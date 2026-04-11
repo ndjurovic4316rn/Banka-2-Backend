@@ -20,7 +20,7 @@ import rs.raf.banka2_bek.currency.model.Currency;
 import rs.raf.banka2_bek.exchange.ExchangeService;
 import rs.raf.banka2_bek.exchange.dto.CalculateExchangeResponseDto;
 import rs.raf.banka2_bek.payment.model.PaymentStatus;
-import rs.raf.banka2_bek.transfer.model.Transfer;
+import rs.raf.banka2_bek.transfers.model.Transfer;
 import rs.raf.banka2_bek.transfers.dto.TransferFxRequestDto;
 import rs.raf.banka2_bek.transfers.dto.TransferInternalRequestDto;
 import rs.raf.banka2_bek.transfers.dto.TransferResponseDto;

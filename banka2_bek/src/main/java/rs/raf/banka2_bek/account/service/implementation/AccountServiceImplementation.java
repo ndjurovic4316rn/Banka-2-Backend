@@ -435,14 +435,6 @@ public class AccountServiceImplementation implements AccountService {
         throw new IllegalStateException("Unable to determine user email from security context.");
     }
 
-    private Client getAuthenticatedClient() {
-        Client client = getOptionalClient();
-        if (client == null) {
-            throw new IllegalArgumentException("Client not found for authenticated user.");
-        }
-        return client;
-    }
-
     private Client getOptionalClient() {
         try {
             String email = getAuthenticatedEmail();

@@ -62,12 +62,4 @@ public final class ListingSpec {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
-
-    /**
-     * Filtrira listinge po tipu i opcionalnoj pretrazi po ticker-u ili imenu.
-     * Pretraga je case-insensitive i partial match.
-     */
-    public static Specification<Listing> byTypeAndSearch(ListingType type, String search) {
-        return withFilters(type, search, null, null, null, null, null);
-    }
 }

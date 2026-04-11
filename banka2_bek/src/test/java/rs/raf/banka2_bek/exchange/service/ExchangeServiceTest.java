@@ -240,7 +240,6 @@ class ExchangeServiceTest {
     void calculateCross_eurToUsd_goesThroughRsd() {
         mockRates();
         CalculateExchangeResponseDto result = exchangeService.calculateCross(100.0, "EUR", "USD");
-        System.out.println(result.getConvertedAmount());
         assertEquals("EUR", result.getFromCurrency());
         assertEquals("USD", result.getToCurrency());
 

@@ -37,6 +37,7 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@lombok.extern.slf4j.Slf4j
 @Service
 public class PaymentServiceImpl implements PaymentService {
 
@@ -208,7 +209,9 @@ public class PaymentServiceImpl implements PaymentService {
                     fromAccount.getAccountNumber(), request.getToAccount(),
                     savedPayment.getCreatedAt() != null ? savedPayment.getCreatedAt().toLocalDate() : java.time.LocalDate.now(),
                     "COMPLETED");
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            log.warn("Failed to send payment confirmation email: {}", e.getMessage());
+        }
 
         return toResponse(savedPayment, client.getId());
     }
@@ -291,7 +294,10 @@ public class PaymentServiceImpl implements PaymentService {
 
     private Client getOptionalClient() {
         try { return clientRepository.findByEmail(getAuthenticatedUsername()).orElse(null); }
-        catch (Exception e) { return null; }
+        catch (Exception e) {
+            log.warn("Failed to resolve client: {}", e.getMessage());
+            return null;
+        }
     }
 
     private String generateOrderNumber() {

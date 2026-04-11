@@ -14,8 +14,6 @@ public interface TaxRecordRepository extends JpaRepository<TaxRecord, Long> {
 
     Optional<TaxRecord> findByUserIdAndUserType(Long userId, String userType);
 
-    List<TaxRecord> findByUserType(String userType);
-
     @Query("SELECT t FROM TaxRecord t WHERE " +
            "(:name IS NULL OR LOWER(t.userName) LIKE LOWER(CONCAT('%', :name, '%'))) AND " +
            "(:userType IS NULL OR t.userType = :userType)")

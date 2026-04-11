@@ -10,9 +10,6 @@ import java.util.List;
 @Repository
 public interface ListingDailyPriceInfoRepository extends JpaRepository<ListingDailyPriceInfo, Long> {
 
-    List<ListingDailyPriceInfo> findByListingIdAndDateBetweenOrderByDateAsc(
-            Long listingId, LocalDate from, LocalDate to);
-
     List<ListingDailyPriceInfo> findByListingIdOrderByDateDesc(Long listingId);
 
     List<ListingDailyPriceInfo> findByListingIdAndDate(Long listingId, LocalDate date);

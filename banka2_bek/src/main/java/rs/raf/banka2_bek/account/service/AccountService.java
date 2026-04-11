@@ -15,8 +15,7 @@ public interface AccountService {
      * Returns a list of active accounts for the currently authenticated client,
      * sorted by available balance in descending order.
      *
-     * @return list of account response DTOs
-     * @throws IllegalStateException if the authenticated user is not a client
+     * @return list of account response DTOs (empty if the authenticated user is not a client)
      */
     List<AccountResponseDto> getMyAccounts();
 

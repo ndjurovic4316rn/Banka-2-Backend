@@ -6,9 +6,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Entity
 @Table(
@@ -52,11 +50,6 @@ public class User implements UserDetails {
 
     @Column(length = 255)
     private String saltPassword;
-
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "user_linked_accounts", joinColumns = @JoinColumn(name = "user_id"))
-    @Column(name = "account_reference")
-    private Set<String> linkedAccounts = new HashSet<>();
 
     @Column(nullable = false)
     private boolean active = true;
@@ -187,14 +180,6 @@ public class User implements UserDetails {
 
     public void setSaltPassword(String saltPassword) {
         this.saltPassword = saltPassword;
-    }
-
-    public Set<String> getLinkedAccounts() {
-        return linkedAccounts;
-    }
-
-    public void setLinkedAccounts(Set<String> linkedAccounts) {
-        this.linkedAccounts = linkedAccounts;
     }
 
     public boolean isActive() {

@@ -12,11 +12,13 @@ import rs.raf.banka2_bek.account.repository.AccountRepository;
 import rs.raf.banka2_bek.order.dto.CreateOrderDto;
 import rs.raf.banka2_bek.order.model.OrderDirection;
 import rs.raf.banka2_bek.order.model.OrderType;
-import rs.raf.banka2_bek.order.repository.OrderRepository;
+import rs.raf.banka2_bek.portfolio.model.Portfolio;
+import rs.raf.banka2_bek.portfolio.repository.PortfolioRepository;
 import rs.raf.banka2_bek.stock.model.Listing;
 import rs.raf.banka2_bek.stock.model.ListingType;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,7 +29,7 @@ import static org.mockito.Mockito.*;
 class FundsVerificationServiceTest {
 
     @Mock private AccountRepository accountRepository;
-    @Mock private OrderRepository orderRepository;
+    @Mock private PortfolioRepository portfolioRepository;
 
     @InjectMocks
     private FundsVerificationService service;
@@ -171,12 +173,19 @@ class FundsVerificationServiceTest {
     @DisplayName("SELL — provera portfolija")
     class SellPortfolioCheck {
 
+        private Portfolio portfolioWith(Long listingId, int quantity) {
+            Portfolio p = new Portfolio();
+            p.setListingId(listingId);
+            p.setQuantity(quantity);
+            return p;
+        }
+
         @Test
         @DisplayName("SELL sa dovoljno hartija u portfoliju → prolazi")
         void sellWithSufficientPortfolio() {
             CreateOrderDto dto = sellDto(1L, 5);
             when(accountRepository.findById(1L)).thenReturn(Optional.of(accountWithBalance(BigDecimal.ZERO, BigDecimal.ZERO)));
-            when(orderRepository.getNetPortfolioQuantity(1L, 1L)).thenReturn(10);
+            when(portfolioRepository.findByUserId(1L)).thenReturn(List.of(portfolioWith(1L, 10)));
 
             assertDoesNotThrow(() ->
                     service.verify(dto, 1L, new BigDecimal("500"), stockListing(new BigDecimal("100")), OrderType.MARKET, OrderDirection.SELL));
@@ -187,34 +196,34 @@ class FundsVerificationServiceTest {
         void sellWithExactPortfolio() {
             CreateOrderDto dto = sellDto(1L, 10);
             when(accountRepository.findById(1L)).thenReturn(Optional.of(accountWithBalance(BigDecimal.ZERO, BigDecimal.ZERO)));
-            when(orderRepository.getNetPortfolioQuantity(1L, 1L)).thenReturn(10);
+            when(portfolioRepository.findByUserId(1L)).thenReturn(List.of(portfolioWith(1L, 10)));
 
             assertDoesNotThrow(() ->
                     service.verify(dto, 1L, new BigDecimal("1000"), stockListing(new BigDecimal("100")), OrderType.MARKET, OrderDirection.SELL));
         }
 
         @Test
-        @DisplayName("SELL bez dovoljno hartija → Insufficient securities")
+        @DisplayName("SELL bez dovoljno hartija → Insufficient securities in portfolio")
         void sellWithInsufficientPortfolio() {
             CreateOrderDto dto = sellDto(1L, 15);
             when(accountRepository.findById(1L)).thenReturn(Optional.of(accountWithBalance(BigDecimal.ZERO, BigDecimal.ZERO)));
-            when(orderRepository.getNetPortfolioQuantity(1L, 1L)).thenReturn(10);
+            when(portfolioRepository.findByUserId(1L)).thenReturn(List.of(portfolioWith(1L, 10)));
 
             IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
                     service.verify(dto, 1L, new BigDecimal("1500"), stockListing(new BigDecimal("100")), OrderType.MARKET, OrderDirection.SELL));
-            assertEquals("Insufficient securities", ex.getMessage());
+            assertTrue(ex.getMessage().startsWith("Insufficient securities"));
         }
 
         @Test
-        @DisplayName("SELL sa praznim portfolijem → Insufficient securities")
+        @DisplayName("SELL sa praznim portfolijem → Insufficient securities in portfolio")
         void sellWithEmptyPortfolio() {
             CreateOrderDto dto = sellDto(1L, 1);
             when(accountRepository.findById(1L)).thenReturn(Optional.of(accountWithBalance(BigDecimal.ZERO, BigDecimal.ZERO)));
-            when(orderRepository.getNetPortfolioQuantity(1L, 1L)).thenReturn(0);
+            when(portfolioRepository.findByUserId(1L)).thenReturn(List.of());
 
             IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
                     service.verify(dto, 1L, new BigDecimal("100"), stockListing(new BigDecimal("100")), OrderType.MARKET, OrderDirection.SELL));
-            assertEquals("Insufficient securities", ex.getMessage());
+            assertTrue(ex.getMessage().startsWith("Insufficient securities"));
         }
     }
 

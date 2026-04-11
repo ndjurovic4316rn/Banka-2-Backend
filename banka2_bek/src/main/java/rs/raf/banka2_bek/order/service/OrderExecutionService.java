@@ -133,16 +133,18 @@ public class OrderExecutionService {
             }
         }
 
-        // 3. Odrediti količinu za fill (Vremenska formula)
-        long volume = (listing.getVolume() == null || listing.getVolume() == 0) ? 1 : listing.getVolume();
-        int remaining = order.getRemainingPortions();
+        // 3. Odrediti količinu za fill
+        int remaining = order.getRemainingPortions() != null ? order.getRemainingPortions() : order.getQuantity();
+        if (remaining <= 0) {
+            order.setDone(true);
+            order.setStatus(OrderStatus.DONE);
+            order.setLastModification(LocalDateTime.now());
+            orderRepository.save(order);
+            return;
+        }
 
-        // Formula: maxInterval u sekundama, pa randomizacija
-        long maxInterval = (24L * 60L) / (volume / (long) remaining);
-        if (maxInterval <= 0) maxInterval = 1;
-        long randomInterval = ThreadLocalRandom.current().nextLong(0, maxInterval + 1);
-
-        int fillQuantity = Math.max(1, (int) (remaining / Math.max(1, randomInterval)));
+        // Spec: Random fill quantity between 1 and remaining
+        int fillQuantity = ThreadLocalRandom.current().nextInt(1, remaining + 1);
         fillQuantity = Math.min(fillQuantity, remaining);
 
         // b. AON (All-or-None) provera

@@ -1,5 +1,7 @@
 package rs.raf.banka2_bek.payment.controller;
 
+import org.springframework.context.annotation.Import;
+import rs.raf.banka2_bek.TestObjectMapperConfig;
 import jakarta.persistence.EntityManager;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,6 +60,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 
+@Import(TestObjectMapperConfig.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 class PaymentControllerIntegrationTest {

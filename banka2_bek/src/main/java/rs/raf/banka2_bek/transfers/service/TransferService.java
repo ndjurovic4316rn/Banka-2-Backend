@@ -11,8 +11,8 @@ import rs.raf.banka2_bek.account.model.AccountStatus;
 import rs.raf.banka2_bek.client.model.Client;
 import rs.raf.banka2_bek.exchange.dto.CalculateExchangeResponseDto;
 import rs.raf.banka2_bek.payment.model.PaymentStatus;
-import rs.raf.banka2_bek.transfer.model.Transfer;
-import rs.raf.banka2_bek.transfer.model.TransferType;
+import rs.raf.banka2_bek.transfers.model.Transfer;
+import rs.raf.banka2_bek.transfers.model.TransferType;
 import rs.raf.banka2_bek.transfers.dto.TransferFxRequestDto;
 import rs.raf.banka2_bek.transfers.dto.TransferInternalRequestDto;
 import rs.raf.banka2_bek.transfers.dto.TransferResponseDto;
@@ -255,11 +255,6 @@ public class TransferService {
             result.add(mapToDto(transfer));
         }
         return result;
-    }
-
-    // Backward-compatible overload (used in tests)
-    public List<TransferResponseDto> getAllTransfers(Client client) {
-        return getAllTransfers(client, null, null, null);
     }
 
     public TransferResponseDto getTransferById(Long id) {

@@ -118,7 +118,7 @@ public class PortfolioService {
 
         // Dohvati placeni porez iz TaxRecord-a
         BigDecimal paidTaxThisYear = BigDecimal.ZERO;
-        String userType = isEmployee(userId) ? "EMPLOYEE" : "CLIENT";
+        String userType = isEmployee() ? "EMPLOYEE" : "CLIENT";
         Optional<TaxRecord> taxRecord = taxRecordRepository.findByUserIdAndUserType(userId, userType);
         if (taxRecord.isPresent()) {
             paidTaxThisYear = taxRecord.get().getTaxPaid() != null
@@ -139,7 +139,7 @@ public class PortfolioService {
         );
     }
 
-    private boolean isEmployee(Long userId) {
+    private boolean isEmployee() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_EMPLOYEE".equals(a.getAuthority()) || "ROLE_ADMIN".equals(a.getAuthority()));

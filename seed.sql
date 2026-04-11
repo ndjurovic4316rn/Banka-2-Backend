@@ -155,44 +155,44 @@ AND NOT EXISTS (
   SELECT 1 FROM employee_permissions ep WHERE ep.employee_id = e.id AND ep.permission = p.permission
 );
 
--- Nikola Milenković — Team Lead (sve permisije)
+-- Nikola Milenković — Team Lead, Supervizor (bez ADMIN permisije)
 INSERT INTO employee_permissions (employee_id, permission)
 SELECT e.id, p.permission
 FROM employees e
 CROSS JOIN (
-  SELECT 'ADMIN' AS permission UNION ALL
-  SELECT 'TRADE_STOCKS' UNION ALL
+  SELECT 'TRADE_STOCKS' AS permission UNION ALL
   SELECT 'VIEW_STOCKS' UNION ALL
   SELECT 'CREATE_CONTRACTS' UNION ALL
   SELECT 'CREATE_INSURANCE' UNION ALL
-  SELECT 'SUPERVISOR' UNION ALL
-  SELECT 'AGENT'
+  SELECT 'SUPERVISOR'
 ) p
 WHERE e.email = 'nikola.milenkovic@banka.rs'
 AND NOT EXISTS (
   SELECT 1 FROM employee_permissions ep WHERE ep.employee_id = e.id AND ep.permission = p.permission
 );
 
--- Tamara Pavlović — Developer (stocks + contracts)
+-- Tamara Pavlović — Agent (stocks + contracts + agent)
 INSERT INTO employee_permissions (employee_id, permission)
 SELECT e.id, p.permission
 FROM employees e
 CROSS JOIN (
   SELECT 'VIEW_STOCKS' AS permission UNION ALL
   SELECT 'TRADE_STOCKS' UNION ALL
-  SELECT 'CREATE_CONTRACTS'
+  SELECT 'CREATE_CONTRACTS' UNION ALL
+  SELECT 'AGENT'
 ) p
 WHERE e.email = 'tamara.pavlovic@banka.rs'
 AND NOT EXISTS (
   SELECT 1 FROM employee_permissions ep WHERE ep.employee_id = e.id AND ep.permission = p.permission
 );
 
--- Đorđe Janković — HR Manager (supervisor + agent)
+-- Đorđe Janković — Agent (stocks + agent)
 INSERT INTO employee_permissions (employee_id, permission)
 SELECT e.id, p.permission
 FROM employees e
 CROSS JOIN (
-  SELECT 'SUPERVISOR' AS permission UNION ALL
+  SELECT 'VIEW_STOCKS' AS permission UNION ALL
+  SELECT 'TRADE_STOCKS' UNION ALL
   SELECT 'AGENT'
 ) p
 WHERE e.email = 'djordje.jankovic@banka.rs'
@@ -200,14 +200,16 @@ AND NOT EXISTS (
   SELECT 1 FROM employee_permissions ep WHERE ep.employee_id = e.id AND ep.permission = p.permission
 );
 
--- Maja Ristić — Accountant (insurance + contracts + view stocks)
+-- Maja Ristić — Agent (insurance + contracts + stocks + agent)
 INSERT INTO employee_permissions (employee_id, permission)
 SELECT e.id, p.permission
 FROM employees e
 CROSS JOIN (
   SELECT 'CREATE_INSURANCE' AS permission UNION ALL
   SELECT 'CREATE_CONTRACTS' UNION ALL
-  SELECT 'VIEW_STOCKS'
+  SELECT 'VIEW_STOCKS' UNION ALL
+  SELECT 'TRADE_STOCKS' UNION ALL
+  SELECT 'AGENT'
 ) p
 WHERE e.email = 'maja.ristic@banka.rs'
 AND NOT EXISTS (

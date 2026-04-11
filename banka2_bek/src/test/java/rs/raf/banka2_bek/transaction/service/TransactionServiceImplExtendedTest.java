@@ -23,7 +23,7 @@ import rs.raf.banka2_bek.transaction.dto.TransactionResponseDto;
 import rs.raf.banka2_bek.transaction.model.Transaction;
 import rs.raf.banka2_bek.transaction.repository.TransactionRepository;
 import rs.raf.banka2_bek.transaction.service.implementation.TransactionServiceImpl;
-import rs.raf.banka2_bek.transfer.model.Transfer;
+import rs.raf.banka2_bek.transfers.model.Transfer;
 
 import java.math.BigDecimal;
 import java.util.Collections;

@@ -10,6 +10,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.*;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.context.annotation.Import;
+import rs.raf.banka2_bek.TestObjectMapperConfig;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.DefaultResponseErrorHandler;
@@ -30,6 +32,7 @@ import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Import(TestObjectMapperConfig.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)

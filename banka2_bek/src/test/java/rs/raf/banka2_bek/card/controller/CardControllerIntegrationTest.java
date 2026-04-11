@@ -1,5 +1,7 @@
 package rs.raf.banka2_bek.card.controller;
 
+import org.springframework.context.annotation.Import;
+import rs.raf.banka2_bek.TestObjectMapperConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -52,6 +54,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Import(TestObjectMapperConfig.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 class CardControllerIntegrationTest {

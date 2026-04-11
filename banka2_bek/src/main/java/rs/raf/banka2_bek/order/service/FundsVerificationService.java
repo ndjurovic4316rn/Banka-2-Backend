@@ -7,7 +7,8 @@ import rs.raf.banka2_bek.account.repository.AccountRepository;
 import rs.raf.banka2_bek.order.dto.CreateOrderDto;
 import rs.raf.banka2_bek.order.model.OrderDirection;
 import rs.raf.banka2_bek.order.model.OrderType;
-import rs.raf.banka2_bek.order.repository.OrderRepository;
+import rs.raf.banka2_bek.portfolio.model.Portfolio;
+import rs.raf.banka2_bek.portfolio.repository.PortfolioRepository;
 import rs.raf.banka2_bek.stock.model.Listing;
 import rs.raf.banka2_bek.stock.model.ListingType;
 
@@ -19,7 +20,7 @@ import java.math.RoundingMode;
 public class FundsVerificationService {
 
     private final AccountRepository accountRepository;
-    private final OrderRepository orderRepository;
+    private final PortfolioRepository portfolioRepository;
 
     public void verify(CreateOrderDto dto, Long userId, BigDecimal approximatePrice, Listing listing, OrderType orderType, OrderDirection direction) {
         Account account = accountRepository.findById(dto.getAccountId())
@@ -80,9 +81,14 @@ public class FundsVerificationService {
     }
 
     private void verifySell(Long userId, Listing listing, int quantity) {
-        int netQuantity = orderRepository.getNetPortfolioQuantity(userId, listing.getId());
-        if (netQuantity < quantity) {
-            throw new IllegalArgumentException("Insufficient securities");
+        // Check actual portfolio holdings (not just completed orders)
+        int currentHolding = portfolioRepository.findByUserId(userId).stream()
+                .filter(p -> p.getListingId().equals(listing.getId()))
+                .mapToInt(Portfolio::getQuantity)
+                .sum();
+
+        if (currentHolding < quantity) {
+            throw new IllegalArgumentException("Insufficient securities in portfolio. You have " + currentHolding + " but tried to sell " + quantity);
         }
     }
 }

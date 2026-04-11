@@ -12,7 +12,7 @@ import rs.raf.banka2_bek.client.model.Client;
 import rs.raf.banka2_bek.currency.model.Currency;
 import rs.raf.banka2_bek.employee.model.Employee;
 import rs.raf.banka2_bek.payment.model.Payment;
-import rs.raf.banka2_bek.transfer.model.Transfer;
+import rs.raf.banka2_bek.transfers.model.Transfer;
 
 /**
  * Imutabilni zapis svake finansijske operacije na računu.
