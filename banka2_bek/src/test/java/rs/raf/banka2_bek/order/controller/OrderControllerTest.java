@@ -217,7 +217,8 @@ class OrderControllerTest {
                       "direction": "BUY",
                       "quantity": 0,
                       "contractSize": 1,
-                      "accountId": 100
+                      "accountId": 100,
+                      "otpCode": "123456"
                     }
                     """;
 
