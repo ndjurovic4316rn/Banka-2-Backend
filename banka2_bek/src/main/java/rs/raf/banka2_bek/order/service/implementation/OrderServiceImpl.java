@@ -93,19 +93,23 @@ public class OrderServiceImpl implements OrderService {
         Account account;
         Portfolio portfolio = null;
         if (direction == OrderDirection.BUY) {
-            if (isEmployee) {
-                account = bankTradingAccountResolver.resolve(listingCurrencyCode);
-            } else {
+            if (dto.getAccountId() != null) {
                 account = accountRepository.findForUpdateById(dto.getAccountId())
                         .orElseThrow(() -> new EntityNotFoundException("Racun ne postoji: " + dto.getAccountId()));
+            } else if (isEmployee) {
+                account = bankTradingAccountResolver.resolve(listingCurrencyCode);
+            } else {
+                throw new EntityNotFoundException("Racun ne postoji: null");
             }
         } else {
             // SELL — portfolio rezervacija hartija
-            if (isEmployee) {
-                account = bankTradingAccountResolver.resolve(listingCurrencyCode);
-            } else {
+            if (dto.getAccountId() != null) {
                 account = accountRepository.findForUpdateById(dto.getAccountId())
                         .orElseThrow(() -> new EntityNotFoundException("Racun ne postoji: " + dto.getAccountId()));
+            } else if (isEmployee) {
+                account = bankTradingAccountResolver.resolve(listingCurrencyCode);
+            } else {
+                throw new EntityNotFoundException("Racun ne postoji: null");
             }
             portfolio = portfolioRepository
                     .findByUserIdAndListingIdForUpdate(userContext.userId, listing.getId())
@@ -296,17 +300,16 @@ public class OrderServiceImpl implements OrderService {
 
         if (order.getDirection() == OrderDirection.BUY) {
             Account account;
-            if (isEmployee) {
-                account = bankTradingAccountResolver.resolve(listingCurrencyCode);
-            } else {
-                Long accountId = order.getAccountId() != null
-                        ? order.getAccountId()
-                        : order.getReservedAccountId();
-                if (accountId == null) {
-                    throw new EntityNotFoundException("Order nema povezan racun za rezervaciju");
-                }
+            Long accountId = order.getReservedAccountId() != null
+                    ? order.getReservedAccountId()
+                    : order.getAccountId();
+            if (accountId != null) {
                 account = accountRepository.findForUpdateById(accountId)
                         .orElseThrow(() -> new EntityNotFoundException("Racun ne postoji: " + accountId));
+            } else if (isEmployee) {
+                account = bankTradingAccountResolver.resolve(listingCurrencyCode);
+            } else {
+                throw new EntityNotFoundException("Order nema povezan racun za rezervaciju");
             }
 
             String accountCurrencyCode = account.getCurrency().getCode();

@@ -480,6 +480,7 @@ class OrderServiceImplTest {
         @DisplayName("AGENT BUY — koristi bankin trading racun, provizija=0, userRole=EMPLOYEE")
         void createOrder_agentBuy_usesBankTradingAccount_commissionZero() {
             CreateOrderDto dto = validMarketBuyDto();
+            dto.setAccountId(null); // agent bez eksplicitnog accountId → resolver
             mockSecurityContext("agent@test.com");
 
             ActuaryInfo agentInfo = new ActuaryInfo();
@@ -683,6 +684,7 @@ class OrderServiceImplTest {
         @DisplayName("AGENT SELL — koristi bankin receiving racun, portfolio rezervacija ide")
         void createOrder_agentSell_usesBankTradingReceivingAccount() {
             CreateOrderDto dto = validMarketSellDto();
+            dto.setAccountId(null); // agent bez eksplicitnog accountId → resolver
             mockSecurityContext("agent@test.com");
 
             // Agent portfolio — premapiramo na employee userId=99
