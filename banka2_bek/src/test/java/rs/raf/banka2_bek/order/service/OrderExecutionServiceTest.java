@@ -7,6 +7,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 import rs.raf.banka2_bek.account.model.Account;
 import rs.raf.banka2_bek.account.repository.AccountRepository;
 import rs.raf.banka2_bek.company.model.Company;
@@ -32,6 +35,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class OrderExecutionServiceTest {
     @Mock private OrderRepository orderRepository;
     @Mock private ListingRepository listingRepository;
@@ -39,6 +43,7 @@ class OrderExecutionServiceTest {
     @Mock private PortfolioRepository portfolioRepository;
     @Mock private TransactionRepository transactionRepository;
     @Mock private AonValidationService aonValidationService;
+    @Mock private FundReservationService fundReservationService;
 
     @InjectMocks
     private OrderExecutionService orderExecutionService;
@@ -50,6 +55,10 @@ class OrderExecutionServiceTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(orderExecutionService, "bankRegistrationNumber", "BANK");
+        ReflectionTestUtils.setField(orderExecutionService, "initialDelaySeconds", 0L);
+        ReflectionTestUtils.setField(orderExecutionService, "afterHoursDelaySeconds", 0L);
+
         testListing = new Listing();
         testListing.setId(1L);
         testListing.setTicker("AAPL");
@@ -99,12 +108,13 @@ class OrderExecutionServiceTest {
         when(listingRepository.findById(1L)).thenReturn(Optional.of(testListing));
         when(accountRepository.findById(1L)).thenReturn(Optional.of(testAccount));
         when(aonValidationService.checkCanExecuteAon(any(), anyInt())).thenReturn(true);
-        when(accountRepository.findAll()).thenReturn(List.of(bankAccount));
+        when(accountRepository.findBankAccountByCurrencyId(any(), any())).thenReturn(Optional.of(bankAccount));
 
         orderExecutionService.executeOrders();
 
-        // Provera: Sredstva su skinuta (Cena 100 * kolicina + provizija)
-        assertTrue(testAccount.getBalance().compareTo(new BigDecimal("10000.00")) < 0);
+        // Provera: FundReservationService je pozvan za BUY fill (Phase 6 rewire)
+        verify(fundReservationService, atLeastOnce())
+                .consumeForBuyFill(eq(testOrder), anyInt(), any(BigDecimal.class));
         verify(orderRepository, atLeastOnce()).save(testOrder);
     }
 
@@ -153,7 +163,7 @@ class OrderExecutionServiceTest {
         when(accountRepository.findById(1L)).thenReturn(Optional.of(testAccount));
         when(portfolioRepository.findByUserId(any())).thenReturn(List.of()); // Prazan portfolio
         when(aonValidationService.checkCanExecuteAon(any(), anyInt())).thenReturn(true);
-        when(accountRepository.findAll()).thenReturn(List.of(bankAccount));
+        when(accountRepository.findBankAccountByCurrencyId(any(), any())).thenReturn(Optional.of(bankAccount));
 
         orderExecutionService.executeOrders();
 

@@ -84,7 +84,7 @@ class TaxServiceTest {
             Order buy = buildOrder(1L, "CLIENT", OrderDirection.BUY, new BigDecimal("100"), 10, 1);
             Order sell = buildOrder(1L, "CLIENT", OrderDirection.SELL, new BigDecimal("150"), 10, 1);
 
-            when(orderRepository.findAll()).thenReturn(List.of(buy, sell));
+            when(orderRepository.findByIsDoneTrue()).thenReturn(List.of(buy, sell));
             when(userRepository.findById(1L)).thenReturn(Optional.of(
                     new User("Marko", "Petrovic", "marko@test.com", "pass", true, "CLIENT")));
             when(taxRecordRepository.findByUserIdAndUserType(1L, "CLIENT")).thenReturn(Optional.empty());
@@ -109,7 +109,7 @@ class TaxServiceTest {
             Order buy = buildOrder(1L, "CLIENT", OrderDirection.BUY, new BigDecimal("200"), 10, 1);
             Order sell = buildOrder(1L, "CLIENT", OrderDirection.SELL, new BigDecimal("100"), 10, 1);
 
-            when(orderRepository.findAll()).thenReturn(List.of(buy, sell));
+            when(orderRepository.findByIsDoneTrue()).thenReturn(List.of(buy, sell));
             when(userRepository.findById(1L)).thenReturn(Optional.of(
                     new User("Marko", "Petrovic", "marko@test.com", "pass", true, "CLIENT")));
             when(taxRecordRepository.findByUserIdAndUserType(1L, "CLIENT")).thenReturn(Optional.empty());
@@ -132,7 +132,7 @@ class TaxServiceTest {
             Order buy = buildOrder(1L, "CLIENT", OrderDirection.BUY, new BigDecimal("100"), 10, 1);
             Order sell = buildOrder(1L, "CLIENT", OrderDirection.SELL, new BigDecimal("100"), 10, 1);
 
-            when(orderRepository.findAll()).thenReturn(List.of(buy, sell));
+            when(orderRepository.findByIsDoneTrue()).thenReturn(List.of(buy, sell));
             when(userRepository.findById(1L)).thenReturn(Optional.of(
                     new User("Marko", "Petrovic", "marko@test.com", "pass", true, "CLIENT")));
             when(taxRecordRepository.findByUserIdAndUserType(1L, "CLIENT")).thenReturn(Optional.empty());
@@ -151,7 +151,7 @@ class TaxServiceTest {
         void employeeOrders() {
             Order sell = buildOrder(5L, "EMPLOYEE", OrderDirection.SELL, new BigDecimal("200"), 10, 1);
 
-            when(orderRepository.findAll()).thenReturn(List.of(sell));
+            when(orderRepository.findByIsDoneTrue()).thenReturn(List.of(sell));
             when(employeeRepository.findById(5L)).thenReturn(Optional.of(
                     Employee.builder().id(5L).firstName("Ana").lastName("Anic").build()));
             when(taxRecordRepository.findByUserIdAndUserType(5L, "EMPLOYEE")).thenReturn(Optional.empty());
@@ -181,7 +181,7 @@ class TaxServiceTest {
                     .currency("RSD")
                     .build();
 
-            when(orderRepository.findAll()).thenReturn(List.of(sell));
+            when(orderRepository.findByIsDoneTrue()).thenReturn(List.of(sell));
             when(userRepository.findById(1L)).thenReturn(Optional.of(
                     new User("Marko", "P", "m@t.com", "p", true, "CLIENT")));
             when(taxRecordRepository.findByUserIdAndUserType(1L, "CLIENT")).thenReturn(Optional.of(existingRecord));
@@ -200,10 +200,8 @@ class TaxServiceTest {
             Order doneOrder = buildOrder(1L, "CLIENT", OrderDirection.SELL, new BigDecimal("100"), 10, 1);
             doneOrder.setDone(true);
 
-            Order pendingOrder = buildOrder(1L, "CLIENT", OrderDirection.BUY, new BigDecimal("50"), 10, 1);
-            pendingOrder.setDone(false); // Not done
-
-            when(orderRepository.findAll()).thenReturn(List.of(doneOrder, pendingOrder));
+            // findByIsDoneTrue returns only done orders — pending orders are filtered by the repository
+            when(orderRepository.findByIsDoneTrue()).thenReturn(List.of(doneOrder));
             when(userRepository.findById(1L)).thenReturn(Optional.of(
                     new User("M", "P", "m@t.com", "p", true, "CLIENT")));
             when(taxRecordRepository.findByUserIdAndUserType(1L, "CLIENT")).thenReturn(Optional.empty());
@@ -221,7 +219,7 @@ class TaxServiceTest {
         @Test
         @DisplayName("no orders means no tax records saved")
         void noOrders() {
-            when(orderRepository.findAll()).thenReturn(Collections.emptyList());
+            when(orderRepository.findByIsDoneTrue()).thenReturn(Collections.emptyList());
 
             taxService.calculateTaxForAllUsers();
 
@@ -234,7 +232,7 @@ class TaxServiceTest {
             Order user1Sell = buildOrder(1L, "CLIENT", OrderDirection.SELL, new BigDecimal("100"), 10, 1);
             Order user2Buy = buildOrder(2L, "EMPLOYEE", OrderDirection.BUY, new BigDecimal("50"), 20, 1);
 
-            when(orderRepository.findAll()).thenReturn(List.of(user1Sell, user2Buy));
+            when(orderRepository.findByIsDoneTrue()).thenReturn(List.of(user1Sell, user2Buy));
             when(userRepository.findById(1L)).thenReturn(Optional.of(
                     new User("A", "B", "a@b.com", "p", true, "CLIENT")));
             when(employeeRepository.findById(2L)).thenReturn(Optional.of(
@@ -253,7 +251,7 @@ class TaxServiceTest {
             // price=10, qty=5, contractSize=100 -> orderValue = 10*5*100 = 5000
             Order sell = buildOrder(1L, "CLIENT", OrderDirection.SELL, new BigDecimal("10"), 5, 100);
 
-            when(orderRepository.findAll()).thenReturn(List.of(sell));
+            when(orderRepository.findByIsDoneTrue()).thenReturn(List.of(sell));
             when(userRepository.findById(1L)).thenReturn(Optional.of(
                     new User("A", "B", "a@b.com", "p", true, "CLIENT")));
             when(taxRecordRepository.findByUserIdAndUserType(1L, "CLIENT")).thenReturn(Optional.empty());

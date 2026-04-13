@@ -1,6 +1,7 @@
 package rs.raf.banka2_bek.order.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -10,18 +11,23 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import rs.raf.banka2_bek.auth.config.GlobalExceptionHandler;
 import rs.raf.banka2_bek.order.dto.CreateOrderDto;
 import rs.raf.banka2_bek.order.dto.OrderDto;
 import rs.raf.banka2_bek.order.service.OrderService;
+import rs.raf.banka2_bek.otp.service.OtpService;
 
 import jakarta.persistence.EntityNotFoundException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -37,6 +43,9 @@ class OrderControllerTest {
     @Mock
     private OrderService orderService;
 
+    @Mock
+    private OtpService otpService;
+
     @InjectMocks
     private OrderController orderController;
 
@@ -46,6 +55,16 @@ class OrderControllerTest {
                 .standaloneSetup(orderController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+        // Auth postavi u SecurityContext jer kontroler cita auth.getName()
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("test@example.com", null));
+        // OTP verify uvek uspesan u ovim testovima — Phase 7 OTP validacija je pokrivena OrderControllerOtpTest-om
+        when(otpService.verify(anyString(), anyString())).thenReturn(Map.of("verified", true));
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     private OrderDto sampleOrderDto() {
@@ -80,6 +99,7 @@ class OrderControllerTest {
         dto.setQuantity(5);
         dto.setContractSize(1);
         dto.setAccountId(100L);
+        dto.setOtpCode("123456");
         return objectMapper.writeValueAsString(dto);
     }
 
@@ -156,10 +176,12 @@ class OrderControllerTest {
                       "orderType": "MARKET",
                       "direction": "BUY",
                       "quantity": 5,
-                      "accountId": 100
+                      "accountId": 100,
+                      "otpCode": "123456"
                     }
                     """;
 
+            when(orderService.createOrder(any())).thenReturn(sampleOrderDto());
             mockMvc.perform(post("/orders")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))

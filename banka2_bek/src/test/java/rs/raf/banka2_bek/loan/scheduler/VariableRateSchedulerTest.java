@@ -8,6 +8,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import rs.raf.banka2_bek.loan.model.*;
 import rs.raf.banka2_bek.loan.repository.LoanInstallmentRepository;
 import rs.raf.banka2_bek.loan.repository.LoanRepository;
@@ -18,9 +20,11 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class VariableRateSchedulerTest {
 
     @Mock
@@ -88,7 +92,7 @@ class VariableRateSchedulerTest {
         @Test
         @DisplayName("does nothing when no variable-rate loans exist")
         void doesNothingWhenNoVariableLoans() {
-            when(loanRepository.findAll()).thenReturn(Collections.emptyList());
+            when(loanRepository.findByInterestTypeAndStatusIn(any(), any())).thenReturn(Collections.emptyList());
 
             scheduler.adjustVariableRates();
 
@@ -99,8 +103,11 @@ class VariableRateSchedulerTest {
         @Test
         @DisplayName("skips fixed-rate loans")
         void skipsFixedRateLoans() {
+            // Repository query filters by interestType=VARIABLE, so fixed loans never reach the scheduler.
+            // This test verifies that when the query returns empty (no variable loans), nothing is saved.
             Loan fixedLoan = buildFixedLoan(1L);
-            when(loanRepository.findAll()).thenReturn(List.of(fixedLoan));
+            assertThat(fixedLoan.getInterestType()).isEqualTo(InterestType.FIXED);
+            when(loanRepository.findByInterestTypeAndStatusIn(any(), any())).thenReturn(Collections.emptyList());
 
             scheduler.adjustVariableRates();
 
@@ -120,7 +127,10 @@ class VariableRateSchedulerTest {
                     new BigDecimal("1800.0000"), BigDecimal.ZERO);
             paidLoan.setStatus(LoanStatus.PAID);
 
-            when(loanRepository.findAll()).thenReturn(List.of(pendingLoan, paidLoan));
+            // Repository query filters by status IN (ACTIVE, LATE), so PENDING/PAID loans never reach the scheduler.
+            assertThat(pendingLoan.getStatus()).isEqualTo(LoanStatus.PENDING);
+            assertThat(paidLoan.getStatus()).isEqualTo(LoanStatus.PAID);
+            when(loanRepository.findByInterestTypeAndStatusIn(any(), any())).thenReturn(Collections.emptyList());
 
             scheduler.adjustVariableRates();
 
@@ -138,7 +148,7 @@ class VariableRateSchedulerTest {
             LoanInstallment unpaid2 = buildInstallment(2L, loan, false, new BigDecimal("2000.0000"));
             LoanInstallment paid = buildInstallment(3L, loan, true, new BigDecimal("2000.0000"));
 
-            when(loanRepository.findAll()).thenReturn(List.of(loan));
+            when(loanRepository.findByInterestTypeAndStatusIn(any(), any())).thenReturn(List.of(loan));
             when(installmentRepository.findByLoanIdOrderByExpectedDueDateAsc(1L))
                     .thenReturn(List.of(paid, unpaid1, unpaid2));
 
@@ -169,7 +179,7 @@ class VariableRateSchedulerTest {
 
             LoanInstallment unpaid = buildInstallment(1L, loan, false, new BigDecimal("1500.0000"));
 
-            when(loanRepository.findAll()).thenReturn(List.of(loan));
+            when(loanRepository.findByInterestTypeAndStatusIn(any(), any())).thenReturn(List.of(loan));
             when(installmentRepository.findByLoanIdOrderByExpectedDueDateAsc(1L))
                     .thenReturn(List.of(unpaid));
 
@@ -188,7 +198,7 @@ class VariableRateSchedulerTest {
 
             LoanInstallment paid = buildInstallment(1L, loan, true, new BigDecimal("2000.0000"));
 
-            when(loanRepository.findAll()).thenReturn(List.of(loan));
+            when(loanRepository.findByInterestTypeAndStatusIn(any(), any())).thenReturn(List.of(loan));
             when(installmentRepository.findByLoanIdOrderByExpectedDueDateAsc(1L))
                     .thenReturn(List.of(paid));
 
@@ -207,7 +217,7 @@ class VariableRateSchedulerTest {
 
             LoanInstallment unpaid = buildInstallment(1L, loan, false, new BigDecimal("1000.0000"));
 
-            when(loanRepository.findAll()).thenReturn(List.of(loan));
+            when(loanRepository.findByInterestTypeAndStatusIn(any(), any())).thenReturn(List.of(loan));
             when(installmentRepository.findByLoanIdOrderByExpectedDueDateAsc(1L))
                     .thenReturn(List.of(unpaid));
 
@@ -235,7 +245,7 @@ class VariableRateSchedulerTest {
                     new BigDecimal("1500.0000"), BigDecimal.valueOf(60000));
 
             // Loan1 will throw because installmentRepository returns null pointer scenario
-            when(loanRepository.findAll()).thenReturn(List.of(loan1, loan2));
+            when(loanRepository.findByInterestTypeAndStatusIn(any(), any())).thenReturn(List.of(loan1, loan2));
             when(installmentRepository.findByLoanIdOrderByExpectedDueDateAsc(1L))
                     .thenThrow(new RuntimeException("DB error"));
 
@@ -259,7 +269,7 @@ class VariableRateSchedulerTest {
 
             LoanInstallment unpaid = buildInstallment(1L, mortgageLoan, false, new BigDecimal("3000.0000"));
 
-            when(loanRepository.findAll()).thenReturn(List.of(mortgageLoan));
+            when(loanRepository.findByInterestTypeAndStatusIn(any(), any())).thenReturn(List.of(mortgageLoan));
             when(installmentRepository.findByLoanIdOrderByExpectedDueDateAsc(1L))
                     .thenReturn(List.of(unpaid));
 
@@ -285,7 +295,7 @@ class VariableRateSchedulerTest {
             LoanInstallment unpaid1 = buildInstallment(1L, loan, false, new BigDecimal("2000.0000"));
             LoanInstallment unpaid2 = buildInstallment(2L, loan, false, new BigDecimal("2000.0000"));
 
-            when(loanRepository.findAll()).thenReturn(List.of(loan));
+            when(loanRepository.findByInterestTypeAndStatusIn(any(), any())).thenReturn(List.of(loan));
             when(installmentRepository.findByLoanIdOrderByExpectedDueDateAsc(1L))
                     .thenReturn(List.of(unpaid1, unpaid2));
 

@@ -63,7 +63,8 @@ public class OptionController {
                     content = @Content(schema = @Schema(implementation = MessageResponseDto.class)))
     })
     @PostMapping("/{id}/exercise")
-    @PreAuthorize("hasAnyAuthority('AGENT', 'SUPERVISOR', 'ADMIN', 'ROLE_ADMIN')")
+    // Fine-grained check u OptionService.ensureUserCanExerciseOptions
+    // (admin ILI aktuar). Security config zahteva authenticated().
     public ResponseEntity<MessageResponseDto> exerciseOption(
             @PathVariable Long id,
             Authentication authentication

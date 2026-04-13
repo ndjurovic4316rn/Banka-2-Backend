@@ -135,8 +135,8 @@ public class TaxService {
                 }
             }
 
-            // Za svaki listing: profit = sell - buy, konvertuj u RSD,
-            // akumuliraj samo pozitivne (kapitalna dobit).
+            // Za svaki listing: profit = sell - buy, konvertuj u RSD, akumuliraj.
+            // NET dobit/gubitak se racuna preko svih listinga; porez je 0 ako je total <= 0.
             BigDecimal totalProfit = BigDecimal.ZERO;
             Set<Long> allListings = new HashSet<>(buyByListing.keySet());
             allListings.addAll(sellByListing.keySet());
@@ -144,11 +144,9 @@ public class TaxService {
                 BigDecimal sell = sellByListing.getOrDefault(listingId, BigDecimal.ZERO);
                 BigDecimal buy = buyByListing.getOrDefault(listingId, BigDecimal.ZERO);
                 BigDecimal assetProfit = sell.subtract(buy);
-                if (assetProfit.compareTo(BigDecimal.ZERO) > 0) {
-                    String listingCurrency = currencyByListing.getOrDefault(listingId, "RSD");
-                    BigDecimal profitInRsd = convertToRsd(assetProfit, listingCurrency);
-                    totalProfit = totalProfit.add(profitInRsd);
-                }
+                String listingCurrency = currencyByListing.getOrDefault(listingId, "RSD");
+                BigDecimal profitInRsd = convertToRsd(assetProfit, listingCurrency);
+                totalProfit = totalProfit.add(profitInRsd);
             }
             BigDecimal taxOwed = totalProfit.compareTo(BigDecimal.ZERO) > 0
                     ? totalProfit.multiply(TAX_RATE).setScale(4, RoundingMode.HALF_UP)
