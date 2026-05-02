@@ -1,7 +1,6 @@
 package rs.raf.banka2_bek.interbank.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.jackson.autoconfigure.JacksonProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,10 +14,8 @@ import rs.raf.banka2_bek.interbank.protocol.MessageType;
 import rs.raf.banka2_bek.interbank.repository.InterbankMessageRepository;
 
 import java.security.SecureRandom;
-import java.util.Base64;
 import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.UUID;
 
 /*
 ================================================================================

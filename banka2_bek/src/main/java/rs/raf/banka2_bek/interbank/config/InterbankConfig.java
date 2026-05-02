@@ -15,9 +15,9 @@ import java.time.Duration;
 @Configuration
 public class InterbankConfig {
 
-    @Bean
+    @Bean(name = "interbankObjectMapper")
     @Primary
-    public ObjectMapper objectMapper() {
+    public ObjectMapper interbankObjectMapper() {
         return new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
