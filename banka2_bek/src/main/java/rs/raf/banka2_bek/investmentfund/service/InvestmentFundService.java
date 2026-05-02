@@ -5,21 +5,37 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import rs.raf.banka2_bek.account.model.*;
+import rs.raf.banka2_bek.account.repository.AccountRepository;
+import rs.raf.banka2_bek.account.util.AccountNumberUtils;
+import rs.raf.banka2_bek.actuary.model.ActuaryType;
+import rs.raf.banka2_bek.actuary.repository.ActuaryInfoRepository;
+import rs.raf.banka2_bek.auth.util.UserRole;
 import rs.raf.banka2_bek.client.repository.ClientRepository;
+import rs.raf.banka2_bek.company.model.Company;
+import rs.raf.banka2_bek.company.repository.CompanyRepository;
+import rs.raf.banka2_bek.currency.model.Currency;
+import rs.raf.banka2_bek.currency.repository.CurrencyRepository;
+import rs.raf.banka2_bek.employee.model.Employee;
+import rs.raf.banka2_bek.employee.repository.EmployeeRepository;
+import jakarta.persistence.EntityNotFoundException;
 import rs.raf.banka2_bek.investmentfund.dto.InvestmentFundDtos.*;
-import rs.raf.banka2_bek.investmentfund.model.FundValueSnapshot;
-import rs.raf.banka2_bek.investmentfund.repository.FundValueSnapshotRepository;
-import rs.raf.banka2_bek.investmentfund.model.ClientFundPosition;
-import rs.raf.banka2_bek.investmentfund.model.InvestmentFund;
-import rs.raf.banka2_bek.investmentfund.repository.ClientFundPositionRepository;
-import rs.raf.banka2_bek.investmentfund.repository.InvestmentFundRepository;
+import rs.raf.banka2_bek.investmentfund.mapper.InvestmentFundMapper;
+import rs.raf.banka2_bek.investmentfund.model.*;
+import rs.raf.banka2_bek.investmentfund.repository.*;
+import rs.raf.banka2_bek.order.service.CurrencyConversionService;
+import rs.raf.banka2_bek.portfolio.model.Portfolio;
+import rs.raf.banka2_bek.portfolio.repository.PortfolioRepository;
+import rs.raf.banka2_bek.stock.model.Listing;
+import rs.raf.banka2_bek.stock.repository.ListingRepository;
+import rs.raf.banka2_bek.stock.util.ListingCurrencyResolver;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /*
 ================================================================================
@@ -86,13 +102,18 @@ import java.util.stream.Collectors;
 public class InvestmentFundService {
 
     private final FundValueSnapshotRepository fundValueSnapshotRepository;
-
     private final InvestmentFundRepository investmentFundRepository;
-    // T12 (P9 + listMyPositions): repoze za pozicije + lookup klijenta-vlasnika banke.
-    // Ostale zavisnosti (FundValueCalculator, CurrencyConversionService,
-    // ClientFundTransactionRepository, FundLiquidationService, ...) ce dodati T7-T9.
     private final ClientFundPositionRepository clientFundPositionRepository;
     private final ClientRepository clientRepository;
+    private final AccountRepository accountRepository;
+    private final CurrencyRepository currencyRepository;
+    private final CompanyRepository companyRepository;
+    private final EmployeeRepository employeeRepository;
+    private final ActuaryInfoRepository actuaryInfoRepository;
+    private final PortfolioRepository portfolioRepository;
+    private final ListingRepository listingRepository;
+    private final FundValueCalculator fundValueCalculator;
+    private final CurrencyConversionService currencyConversionService;
 
     /**
      * T12 — fallback strategija za "Banka kao klijent fonda" (Celina 4 (Nova) §4406-4435).
@@ -108,15 +129,148 @@ public class InvestmentFundService {
 
     @Transactional
     public InvestmentFundDetailDto createFund(CreateFundDto dto, Long supervisorId) {
-        throw new UnsupportedOperationException("TODO");
+        if (investmentFundRepository.findByName(dto.getName()).isPresent()) {
+            throw new IllegalArgumentException("Fund with name '" + dto.getName() + "' already exists.");
+        }
+
+        actuaryInfoRepository.findByEmployeeId(supervisorId)
+                .filter(a -> a.getActuaryType() == ActuaryType.SUPERVISOR)
+                .orElseThrow(() -> new IllegalStateException("Only supervisors can create funds."));
+
+        Employee supervisor = employeeRepository.findById(supervisorId)
+                .orElseThrow(() -> new IllegalArgumentException("Employee #" + supervisorId + " not found."));
+
+        Currency rsd = currencyRepository.findByCode("RSD")
+                .orElseThrow(() -> new IllegalStateException("RSD currency not found."));
+
+        Company bankCompany = companyRepository.findByIsStateTrue()
+                .orElseThrow(() -> new IllegalStateException("Bank company not found."));
+
+        String accountNumber;
+        do {
+            accountNumber = AccountNumberUtils.generate(AccountType.BUSINESS, null, true);
+        } while (accountRepository.existsByAccountNumber(accountNumber));
+
+        Account fundAccount = Account.builder()
+                .accountNumber(accountNumber)
+                .accountType(AccountType.BUSINESS)
+                .accountSubtype(null)
+                .currency(rsd)
+                .company(bankCompany)
+                .employee(supervisor)
+                .balance(BigDecimal.ZERO)
+                .availableBalance(BigDecimal.ZERO)
+                .reservedAmount(BigDecimal.ZERO)
+                .accountCategory(AccountCategory.FUND)
+                .dailyLimit(BigDecimal.ZERO)
+                .monthlyLimit(BigDecimal.ZERO)
+                .dailySpending(BigDecimal.ZERO)
+                .monthlySpending(BigDecimal.ZERO)
+                .maintenanceFee(BigDecimal.ZERO)
+                .status(AccountStatus.ACTIVE)
+                .name("Fund: " + dto.getName())
+                .createdAt(LocalDateTime.now())
+                .build();
+        fundAccount = accountRepository.save(fundAccount);
+
+        InvestmentFund fund = new InvestmentFund();
+        fund.setName(dto.getName());
+        fund.setDescription(dto.getDescription());
+        fund.setMinimumContribution(dto.getMinimumContribution());
+        fund.setManagerEmployeeId(supervisorId);
+        fund.setAccountId(fundAccount.getId());
+        fund.setCreatedAt(LocalDateTime.now());
+        fund.setInceptionDate(LocalDate.now());
+        fund.setActive(true);
+        fund = investmentFundRepository.save(fund);
+
+        FundValueSnapshot initialSnapshot = new FundValueSnapshot();
+        initialSnapshot.setFundId(fund.getId());
+        initialSnapshot.setSnapshotDate(LocalDate.now());
+        initialSnapshot.setFundValue(BigDecimal.ZERO);
+        initialSnapshot.setLiquidAmount(BigDecimal.ZERO);
+        initialSnapshot.setInvestedTotal(BigDecimal.ZERO);
+        initialSnapshot.setProfit(BigDecimal.ZERO);
+        fundValueSnapshotRepository.save(initialSnapshot);
+
+        log.info("Fund '{}' created, account #{}", fund.getName(), fundAccount.getId());
+        return InvestmentFundMapper.toDetailDto(fund, fundAccount, BigDecimal.ZERO, BigDecimal.ZERO,
+                Collections.emptyList(), Collections.emptyList(),
+                supervisor.getFirstName() + " " + supervisor.getLastName());
     }
 
     public List<InvestmentFundSummaryDto> listDiscovery(String searchQuery, String sortField, String sortDirection) {
-        throw new UnsupportedOperationException("TODO");
+        List<InvestmentFund> funds = investmentFundRepository.findByActiveTrueOrderByNameAsc();
+
+        Stream<InvestmentFund> stream = funds.stream();
+        if (searchQuery != null && !searchQuery.isBlank()) {
+            String q = searchQuery.toLowerCase();
+            stream = stream.filter(f ->
+                    (f.getName() != null && f.getName().toLowerCase().contains(q)) ||
+                    (f.getDescription() != null && f.getDescription().toLowerCase().contains(q)));
+        }
+
+        List<InvestmentFundSummaryDto> result = stream.map(f -> {
+            BigDecimal fundValue = safeCompute(() -> fundValueCalculator.computeFundValue(f), BigDecimal.ZERO);
+            BigDecimal profit = safeCompute(() -> fundValueCalculator.computeProfit(f), BigDecimal.ZERO);
+            String managerName = employeeRepository.findById(f.getManagerEmployeeId())
+                    .map(e -> e.getFirstName() + " " + e.getLastName())
+                    .orElse("N/A");
+            return InvestmentFundMapper.toSummaryDto(f, fundValue, profit, managerName);
+        }).collect(Collectors.toCollection(ArrayList::new));
+
+        Comparator<InvestmentFundSummaryDto> comparator = buildComparator(sortField);
+        if ("DESC".equalsIgnoreCase(sortDirection)) {
+            comparator = comparator.reversed();
+        }
+        result.sort(comparator);
+        return result;
     }
 
     public InvestmentFundDetailDto getFundDetails(Long fundId) {
-        throw new UnsupportedOperationException("TODO");
+        InvestmentFund fund = investmentFundRepository.findById(fundId)
+                .orElseThrow(() -> new EntityNotFoundException("Fund #" + fundId + " not found."));
+
+        Account account = accountRepository.findById(fund.getAccountId())
+                .orElseThrow(() -> new EntityNotFoundException("Fund account not found."));
+
+        BigDecimal fundValue = safeCompute(() -> fundValueCalculator.computeFundValue(fund), BigDecimal.ZERO);
+        BigDecimal profit = safeCompute(() -> fundValueCalculator.computeProfit(fund), BigDecimal.ZERO);
+
+        List<Portfolio> portfolios = portfolioRepository.findByUserIdAndUserRole(fund.getId(), UserRole.FUND);
+        List<FundHoldingDto> holdings = portfolios.stream()
+                .filter(p -> p.getQuantity() != null && p.getQuantity() > 0)
+                .map(p -> {
+                    Listing listing = listingRepository.findById(p.getListingId()).orElse(null);
+                    BigDecimal currentPrice = listing != null ? listing.getPrice() : BigDecimal.ZERO;
+                    BigDecimal change = listing != null ? listing.getPriceChange() : BigDecimal.ZERO;
+                    Long volume = listing != null ? listing.getVolume() : 0L;
+                    return new FundHoldingDto(
+                            p.getListingId(),
+                            p.getListingTicker(),
+                            p.getListingName(),
+                            p.getQuantity(),
+                            currentPrice,
+                            change,
+                            volume,
+                            p.getAverageBuyPrice(),
+                            p.getLastModified() != null ? p.getLastModified().toLocalDate() : null);
+                })
+                .toList();
+
+        LocalDate from = LocalDate.now().minusDays(30);
+        LocalDate to = LocalDate.now();
+        List<FundPerformancePointDto> performance = fundValueSnapshotRepository
+                .findByFundIdAndSnapshotDateBetweenOrderBySnapshotDateAsc(fund.getId(), from, to)
+                .stream()
+                .map(s -> new FundPerformancePointDto(s.getSnapshotDate(), s.getFundValue(), s.getProfit()))
+                .toList();
+
+        String managerName = employeeRepository.findById(fund.getManagerEmployeeId())
+                .map(e -> e.getFirstName() + " " + e.getLastName())
+                .orElse("N/A");
+
+        return InvestmentFundMapper.toDetailDto(fund, account, fundValue, profit, holdings, performance, managerName);
     }
 
     /**
@@ -192,52 +346,14 @@ public class InvestmentFundService {
         return result;
     }
 
-    /**
-     * P7 — Spec Celina 4 (Nova) §4338-4391 (Napomena 4): Provizija pri konverziji.
-     *  - Klijent uplacuje sa svog racuna -> ako je sourceAccount.currency != RSD,
-     *    primenjuje se 1% FX komisija (CurrencyConversionService.convertForPurchase
-     *    sa chargeFx=true).
-     *  - Supervizor uplacuje sa bankinog racuna -> 0% komisija (chargeFx=false).
-     *
-     * Zatim:
-     *  - tx = new ClientFundTransaction(status=PENDING, isInflow=true)
-     *  - debit sourceAccount, credit fund.account (RSD)
-     *  - tx.status = COMPLETED, save
-     *  - upsert ClientFundPosition: totalInvested += amount
-     *  - vrati ClientFundPositionDto sa derived %ofFund i currentValue
-     */
     @Transactional
     public ClientFundPositionDto invest(Long fundId, InvestFundDto dto, Long userId, String userRole) {
-        throw new UnsupportedOperationException(
-                "TODO P7: implementirati invest — vidi javadoc iznad. "
-                + "Klijent: 1% FX komisija; Supervizor (banka): 0%.");
+        throw new UnsupportedOperationException("TODO P7: implement invest — T8 task.");
     }
 
-    /**
-     * P7 — Spec Celina 4 (Nova) §4338-4391 (Napomena 4): isto pravilo kao za invest,
-     * ali u suprotnom smeru. Plus P4 likvidacija ako fond nema dovoljno cash-a.
-     *
-     * Logika:
-     *  if (amount == null) amount = position.totalInvested  // pun withdraw
-     *  if (amount > position.totalInvested) -> 400 BadRequest
-     *  if (fund.account.balanceRsd >= amount):
-     *      odmah debit fund.account, credit user account
-     *      (chargeFx = userRole == CLIENT pri konverziji RSD -> targetCurrency)
-     *      tx.status = COMPLETED
-     *  else:
-     *      tx.status = PENDING
-     *      fundLiquidationService.liquidateFor(fundId, amount - balance)
-     *      (vidi P4 — auto-prodaja hartija)
-     *  position.totalInvested -= amount
-     *  if (position.totalInvested <= 0) brisi/active=false
-     */
     @Transactional
     public ClientFundTransactionDto withdraw(Long fundId, WithdrawFundDto dto, Long userId, String userRole) {
-        throw new UnsupportedOperationException(
-                "TODO P7+P4: implementirati withdraw — vidi javadoc iznad. "
-                + "Klijent: 1% FX komisija u konverziji RSD -> account.currency; "
-                + "Supervizor (banka): 0% komisija. Ako fond nema cash-a, "
-                + "tx ostaje PENDING dok FundLiquidationService ne proda hartije.");
+        throw new UnsupportedOperationException("TODO P7+P4: implement withdraw — T8 task.");
     }
 
     /**
@@ -335,31 +451,41 @@ public class InvestmentFundService {
         return dto;
     }
 
-    /**
-     * P5 — Spec Celina 4 (Nova) §3797-3879: kad admin ukloni isSupervisor
-     * permisiju supervizoru koji upravlja fondovima, vlasnistvo svih tih
-     * fondova prebacuje se na admina koji je izvrsio uklanjanje.
-     *
-     * Vraca broj prebacenih fondova (>= 0). Ako oldSupervisor nema fondova,
-     * 0 — bezbedno za pozivanje na svaku permisiju-update operaciju.
-     *
-     * Pozivati iz:
-     *   - EmployeeService / AdminEmployeeService kad permisije menjaju
-     *   - Direktno iz nekog manualnog supervisor-portala dugmeta (ako postoji)
-     */
     @Transactional
     public int reassignFundManager(Long oldSupervisorId, Long newAdminId) {
-        if (oldSupervisorId == null || newAdminId == null) {
-            return 0;
-        }
-        if (oldSupervisorId.equals(newAdminId)) {
-            return 0;
-        }
+        if (oldSupervisorId == null || newAdminId == null) return 0;
+        if (oldSupervisorId.equals(newAdminId)) return 0;
         int reassigned = investmentFundRepository.reassignManager(oldSupervisorId, newAdminId);
         if (reassigned > 0) {
             log.info("InvestmentFund manager reassigned: {} fund(s) from employee #{} to employee #{}",
                     reassigned, oldSupervisorId, newAdminId);
         }
         return reassigned;
+    }
+
+    private Comparator<InvestmentFundSummaryDto> buildComparator(String sortField) {
+        if (sortField == null) return Comparator.comparing(InvestmentFundSummaryDto::getName,
+                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+        return switch (sortField.toLowerCase()) {
+            case "fundvalue" -> Comparator.comparing(InvestmentFundSummaryDto::getFundValue,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+            case "profit" -> Comparator.comparing(InvestmentFundSummaryDto::getProfit,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+            case "minimumcontribution" -> Comparator.comparing(InvestmentFundSummaryDto::getMinimumContribution,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+            case "inceptiondate" -> Comparator.comparing(InvestmentFundSummaryDto::getInceptionDate,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+            default -> Comparator.comparing(InvestmentFundSummaryDto::getName,
+                    Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+        };
+    }
+
+    private <T> T safeCompute(java.util.function.Supplier<T> supplier, T fallback) {
+        try {
+            return supplier.get();
+        } catch (Exception e) {
+            log.warn("FundValueCalculator error: {}", e.getMessage());
+            return fallback;
+        }
     }
 }
