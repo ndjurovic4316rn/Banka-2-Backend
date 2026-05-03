@@ -230,27 +230,18 @@ public class FundLiquidationService {
         if (RSD.equals(listingCurrency)) {
             return BigDecimal.ONE;
         }
-        if (currencyConversionService != null) {
-            return currencyConversionService.getRate(listingCurrency, RSD);
-        }
-        return new BigDecimal("117").setScale(6, RoundingMode.HALF_UP);
+        return currencyConversionService.getRate(listingCurrency, RSD);
     }
 
     private BigDecimal convertToRsd(BigDecimal amount, String fromCurrency) {
         if (amount == null) return BigDecimal.ZERO;
         if (RSD.equals(fromCurrency)) return amount.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
-        if (currencyConversionService != null) {
-            return currencyConversionService.convert(amount, fromCurrency, RSD);
-        }
-        return amount.multiply(new BigDecimal("117")).setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+        return currencyConversionService.convert(amount, fromCurrency, RSD);
     }
 
     private BigDecimal convertFromRsd(BigDecimal amount, String toCurrency) {
         if (RSD.equals(toCurrency)) return amount.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
-        if (currencyConversionService != null) {
-            return currencyConversionService.convert(amount, RSD, toCurrency);
-        }
-        return amount.divide(new BigDecimal("117"), MONEY_SCALE, RoundingMode.HALF_UP);
+        return currencyConversionService.convert(amount, RSD, toCurrency);
     }
 
     private void debit(Account account, BigDecimal amount) {

@@ -34,7 +34,10 @@ services:
     build: ./banka2_bek
     container_name: banka2_backend
     ports:
-      - "8080:8080"
+      # Default 8080. Overrideuj sa BACKEND_HOST_PORT env var-om ako lokalno
+      # imas konflikt (npr. drugi projekat koji takodje sluša 8080):
+      #   BACKEND_HOST_PORT=8088 docker compose up -d
+      - "${BACKEND_HOST_PORT:-8080}:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/banka2
       SPRING_DATASOURCE_USERNAME: banka2user

@@ -419,7 +419,18 @@ public class InvestmentFundService {
         ClientFundPosition position = upsertPosition(fund.getId(), investor, amounts.amountRsd());
         log.info("T8 invest completed: fund={}, investor={}#{}, amountRsd={}, sourceAccount={}",
                 fund.getId(), investor.userRole(), investor.userId(), amounts.amountRsd(), sourceAccount.getId());
-        return toClientFundPositionDto(position, fund.getName());
+
+        BigDecimal fundValue = safeCompute(() -> fundValueCalculator.computeFundValue(fund), BigDecimal.ZERO);
+        BigDecimal sumInvested = clientFundPositionRepository.findByFundId(fund.getId()).stream()
+                .map(ClientFundPosition::getTotalInvested)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return toClientFundPositionDto(
+                position,
+                fund.getName(),
+                resolveUserName(investor.userId(), investor.userRole()),
+                fundValue,
+                sumInvested);
     }
 
     /**
@@ -523,18 +534,14 @@ public class InvestmentFundService {
     /**
      * T12 — Spec Celina 4 (Nova) "Moj portfolio -> Moji fondovi page".
      *
-     * Vraca sve pozicije (ClientFundPosition) za autentifikovanog korisnika.
-     * Pozicija se identifikuje (userId, userRole) parom — supervizor moze
-     * imati pozicije i kao CLIENT (privatne) i preko bankine `ownerClientId`
-     * (kroz listBankPositions, ne ovde).
+     * Vraca sve pozicije (ClientFundPosition) za autentifikovanog korisnika
+     * sa popunjenim izvedenim poljima (currentValue, percentOfFund, profit, userName).
      *
-     * Izvedena polja (currentValue, percentOfFund, profit) ostaju null:
-     *  - zavise od FundValueCalculator-a koji T7+T10 jos pisu (FundValueSnapshot
-     *    + ListingRepository + CurrencyConversionService)
-     *  - kad budu dostupni, dopuni `toClientFundPositionDto` mapper
-     *    (umesto null, popuni iz cached snapshot-a ili racunaj live)
-     *
-     * Koristi se iz InvestmentFundController.GET /funds/my-positions.
+     * Batch-optimizovano:
+     *  - fondovi se ucitavaju jednim findAllById pozivom
+     *  - po fundId-ju jednom racuna fundValue + sumTotalInvested (izbegne N+1
+     *    u toClientFundPositionDto kada korisnik ima pozicije u vise fondova)
+     *  - userName se resolvuje jednom (svi pozicije ovog korisnika dele isti userId/userRole).
      */
     public List<ClientFundPositionDto> listMyPositions(Long userId, String userRole) {
         if (userId == null || userRole == null || userRole.isBlank()) {
@@ -545,12 +552,39 @@ public class InvestmentFundService {
         if (positions.isEmpty()) {
             return List.of();
         }
-        // Batch-load fondova da izbegnemo N+1 lookup za fundName u DTO-u.
         List<Long> fundIds = positions.stream().map(ClientFundPosition::getFundId).distinct().toList();
-        Map<Long, String> fundIdToName = investmentFundRepository.findAllById(fundIds).stream()
-                .collect(Collectors.toMap(InvestmentFund::getId, InvestmentFund::getName));
+        Map<Long, InvestmentFund> fundsById = investmentFundRepository.findAllById(fundIds).stream()
+                .collect(Collectors.toMap(InvestmentFund::getId, f -> f));
+
+        // Pre-compute fundValue + sumTotalInvested per fundId — kasnije se mapper
+        // poziva N puta (po jednom za svaku poziciju) ali bez novih DB poziva.
+        Map<Long, BigDecimal> fundValueById = new HashMap<>();
+        Map<Long, BigDecimal> sumInvestedById = new HashMap<>();
+        for (Long fundId : fundIds) {
+            InvestmentFund fund = fundsById.get(fundId);
+            if (fund == null) {
+                fundValueById.put(fundId, BigDecimal.ZERO);
+                sumInvestedById.put(fundId, BigDecimal.ZERO);
+                continue;
+            }
+            fundValueById.put(fundId, safeCompute(() -> fundValueCalculator.computeFundValue(fund), BigDecimal.ZERO));
+            BigDecimal sumInvested = clientFundPositionRepository.findByFundId(fundId).stream()
+                    .map(ClientFundPosition::getTotalInvested)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            sumInvestedById.put(fundId, sumInvested);
+        }
+
+        String userName = resolveUserName(userId, userRole);
+
         return positions.stream()
-                .map(p -> toClientFundPositionDto(p, fundIdToName.get(p.getFundId())))
+                .map(p -> toClientFundPositionDto(
+                        p,
+                        Optional.ofNullable(fundsById.get(p.getFundId()))
+                                .map(InvestmentFund::getName).orElse(null),
+                        userName,
+                        fundValueById.getOrDefault(p.getFundId(), BigDecimal.ZERO),
+                        sumInvestedById.getOrDefault(p.getFundId(), BigDecimal.ZERO)))
                 .toList();
     }
 
@@ -590,29 +624,74 @@ public class InvestmentFundService {
     }
 
     /**
-     * T12 — privatni mapper iz domena (ClientFundPosition) u FE DTO.
-     * Polja `currentValue`, `percentOfFund`, `profit` ostaju null jer
-     * zavise od FundValueCalculator-a koji T7+T10 jos pisu. Kad budu
-     * dostupni, prosiri ovde (npr. inject FundValueCalculator i racunaj
-     * iz live snapshot-a ili poslednjeg FundValueSnapshot reda).
+     * Mapper iz domena (ClientFundPosition) u FE DTO sa popunjenim izvedenim poljima.
+     *
+     * Pre-compute pristup: caller (listMyPositions/listBankPositions) racuna
+     * fundValue + sumInvested po fundId-ju jednom i prosledjuje ovde, izbegavajuci
+     * N+1 kada korisnik ima pozicije u vise fondova.
+     *
+     * currentValue = fundValue * (position.totalInvested / sumInvested)
+     * percentOfFund = position.totalInvested / sumInvested * 100
+     * profit = currentValue - position.totalInvested
+     *
+     * Edge case: ako sumInvested == 0 (svi su povukli ili tek kreiran fond),
+     * vraca 0 da izbegne deljenje s nulom.
      */
-    private ClientFundPositionDto toClientFundPositionDto(ClientFundPosition position, String fundName) {
+    private ClientFundPositionDto toClientFundPositionDto(
+            ClientFundPosition position,
+            String fundName,
+            String userName,
+            BigDecimal fundValue,
+            BigDecimal sumInvested) {
         ClientFundPositionDto dto = new ClientFundPositionDto();
         dto.setId(position.getId());
         dto.setFundId(position.getFundId());
         dto.setFundName(fundName);
         dto.setUserId(position.getUserId());
         dto.setUserRole(position.getUserRole());
-        // userName: T7+T8 ce dopuniti rezolvujuci po (userId, userRole) iz
-        // clients ili employees tabele. Trenutno ostaje null.
-        dto.setUserName(null);
-        dto.setTotalInvested(position.getTotalInvested());
-        // Izvedena polja — null dok FundValueCalculator (T7+T10) ne bude gotov.
-        dto.setCurrentValue(null);
-        dto.setPercentOfFund(null);
-        dto.setProfit(null);
+        dto.setUserName(userName);
+        BigDecimal totalInvested = position.getTotalInvested() != null
+                ? position.getTotalInvested()
+                : BigDecimal.ZERO;
+        dto.setTotalInvested(totalInvested);
+
+        BigDecimal currentValue = BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+        BigDecimal percentOfFund = BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+        BigDecimal safeFundValue = fundValue != null ? fundValue : BigDecimal.ZERO;
+        BigDecimal safeSumInvested = sumInvested != null ? sumInvested : BigDecimal.ZERO;
+        if (safeSumInvested.signum() > 0) {
+            currentValue = safeFundValue.multiply(totalInvested)
+                    .divide(safeSumInvested, MONEY_SCALE, RoundingMode.HALF_UP);
+            percentOfFund = totalInvested.multiply(new BigDecimal("100"))
+                    .divide(safeSumInvested, MONEY_SCALE, RoundingMode.HALF_UP);
+        }
+        dto.setCurrentValue(currentValue);
+        dto.setPercentOfFund(percentOfFund);
+        dto.setProfit(currentValue.subtract(totalInvested).setScale(MONEY_SCALE, RoundingMode.HALF_UP));
         dto.setLastModifiedAt(position.getLastModifiedAt());
         return dto;
+    }
+
+    private String resolveUserName(Long userId, String userRole) {
+        if (userId == null || userRole == null) return null;
+        if (UserRole.CLIENT.equalsIgnoreCase(userRole)) {
+            return clientRepository.findById(userId)
+                    .map(c -> joinName(c.getFirstName(), c.getLastName()))
+                    .orElse(null);
+        }
+        if (UserRole.isEmployee(userRole) || UserRole.FUND.equalsIgnoreCase(userRole)) {
+            return employeeRepository.findById(userId)
+                    .map(e -> joinName(e.getFirstName(), e.getLastName()))
+                    .orElse(null);
+        }
+        return null;
+    }
+
+    private static String joinName(String first, String last) {
+        String f = first != null ? first.trim() : "";
+        String l = last != null ? last.trim() : "";
+        String full = (f + " " + l).trim();
+        return full.isEmpty() ? null : full;
     }
 
     private InvestmentFund findActiveFund(Long fundId) {

@@ -4,12 +4,14 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import rs.raf.banka2_bek.account.model.Account;
 import rs.raf.banka2_bek.account.repository.AccountRepository;
 import rs.raf.banka2_bek.auth.util.UserRole;
 import rs.raf.banka2_bek.investmentfund.service.FundLiquidationService;
+import rs.raf.banka2_bek.order.event.OrderCompletedEvent;
 import rs.raf.banka2_bek.order.model.Order;
 import rs.raf.banka2_bek.order.model.OrderDirection;
 import rs.raf.banka2_bek.order.model.OrderStatus;
@@ -90,6 +92,7 @@ public class OrderExecutionService {
     private final AonValidationService aonValidationService;
     private final FundReservationService fundReservationService;
     private final FundLiquidationService fundLiquidationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${bank.registration-number}")
     private String bankRegistrationNumber;
@@ -232,6 +235,7 @@ public class OrderExecutionService {
             order.setLastModification(LocalDateTime.now());
             releaseReservationSafe(order);
             orderRepository.save(order);
+            publishOrderCompleted(order);
             return;
         }
 
@@ -325,6 +329,7 @@ public class OrderExecutionService {
         // 6. Ažurirati nalog
         order.setRemainingPortions(order.getRemainingPortions() - fillQuantity);
         order.setLastModification(LocalDateTime.now());
+        boolean justCompleted = false;
         if (order.getRemainingPortions() <= 0) {
             order.setDone(true);
             order.setStatus(OrderStatus.DONE);
@@ -332,6 +337,7 @@ public class OrderExecutionService {
             // Ako je ostao visak rezervacije (npr. fill po nizoj ceni od approxPrice)
             // vrati ga na availableBalance / availableQuantity.
             releaseReservationSafe(order);
+            justCompleted = true;
         } else {
             // Spec: vremenski interval izmedju fill-ova =
             //   Random(0, 24 * 60 / (volume / remaining)) sekundi
@@ -347,6 +353,28 @@ public class OrderExecutionService {
         if ("FUND".equals(order.getUserRole())) {
             log.info("T9 Hook: Detektovan nalog fonda #{}. Pokrecem resolve pending transakcija.", order.getUserId());
             fundLiquidationService.onFillCompleted(order.getId());
+        }
+
+        if (justCompleted) {
+            publishOrderCompleted(order);
+        }
+    }
+
+    /**
+     * Emit-uje {@link OrderCompletedEvent} kad order zavrsi (status DONE).
+     * Konzumenti (npr. {@code ProfitBankCacheEvictionListener}) invalidiraju
+     * cached izvedena polja.
+     */
+    private void publishOrderCompleted(Order order) {
+        try {
+            eventPublisher.publishEvent(new OrderCompletedEvent(
+                    order.getId(),
+                    order.getUserId(),
+                    order.getUserRole(),
+                    order.getFundId()));
+        } catch (RuntimeException ex) {
+            // Ne sme da pukne order fill flow zbog event-a — log i nastavi.
+            log.warn("Order #{} completed event publish failed: {}", order.getId(), ex.getMessage());
         }
     }
 

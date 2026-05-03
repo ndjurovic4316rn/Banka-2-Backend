@@ -118,6 +118,11 @@ public class OrderServiceImpl implements OrderService {
                             "Racun fonda ne postoji: " + fund.getAccountId()));
         } else {
             fund = null;
+            // accountId je opcioni (vec validovan kao null-able na DTO-u zbog
+            // XOR sa fundId-jem). resolveTradingAccount handluje:
+            //   - accountId != null → konkretan racun
+            //   - accountId == null + zaposleni → automatski bankin trading racun u listing valuti
+            //   - accountId == null + klijent → 404 "Racun ne postoji: null"
             account = resolveTradingAccount(dto.getAccountId(), isEmployee, listingCurrencyCode);
         }
         Portfolio portfolio = null;
