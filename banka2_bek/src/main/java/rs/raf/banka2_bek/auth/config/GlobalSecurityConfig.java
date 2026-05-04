@@ -118,6 +118,12 @@ public class GlobalSecurityConfig  {
                         // Profit Banke: samo supervizori (Celina 4 (Nova) §4393-4408).
                         .requestMatchers("/profit-bank/**").hasAnyAuthority(
                                 "ROLE_ADMIN", "ADMIN", "SUPERVISOR")
+                        // FE-facing wrapper za inter-bank OTC: /interbank/otc/** je
+                        // JWT-authenticated (klijent/supervizor pristupaju iz svog
+                        // browser-a), NE X-Api-Key. MORA biti DEKLARISAN PRE generic
+                        // /interbank/** matcher-a (Spring uzima prvi match).
+                        .requestMatchers("/interbank/otc/**").authenticated()
+                        .requestMatchers("/interbank/payments/**").authenticated()
                         // Inter-bank /interbank endpoint je JEDINSTVEN ulaz za druge banke;
                         // InterbankAuthFilter validira X-Api-Key i postavlja ROLE_INTERBANK
                         // authority pre nego sto request stigne ovde (vidi protokol §2.10).

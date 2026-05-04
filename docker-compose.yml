@@ -106,6 +106,13 @@ services:
       SPRING_JPA_SHOW_SQL: "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       SPRING_JPA_PROPERTIES_HIBERNATE_TYPE_PREFERRED_BOOLEAN_JDBC_TYPE: INTEGER
+      # Auth rate limit (Bucket4j) — production radi 10 req/min/IP, ali za
+      # E2E test sesije (Cypress live) capacity se podize na 100k da test
+      # suite ne hituje 429. NAPOMENA: enabled MORA biti `true` jer
+      # GlobalSecurityConfig konstruktorski zavisi od AuthRateLimitFilter
+      # bean-a (nije Optional). Sa capacity=100k filter je no-op u praksi.
+      AUTH_RATE_LIMIT_ENABLED: ${AUTH_RATE_LIMIT_ENABLED:-true}
+      AUTH_RATE_LIMIT_CAPACITY: ${AUTH_RATE_LIMIT_CAPACITY:-100000}
     # host.docker.internal alias za pristup host portovima (Linux native Docker
     # zahteva eksplicitan host-gateway alias; Docker Desktop ima nativno).
     # Koristi se SAMO za opcioni Arbitro stack u Banka-2-Tools/docker-compose.yml

@@ -26,8 +26,17 @@ public class InterbankAuthFilter extends OncePerRequestFilter {
     /**
      * Putanje koje protokol §3 rezervise za inter-bank pozive (zahtevaju X-Api-Key).
      * Pored generic /interbank ulaza za 2PC (§2.11), tu su i §3 OTC negotiation rute.
+     *
+     * VAZNO: /interbank/otc/** i /interbank/payments/** su FE-facing wrapper rute
+     * koje koriste JWT auth (klijent/supervizor pristupa iz browser-a). NE smemo
+     * ih preuzeti u ovaj filter jer X-Api-Key header nije prisutan u FE zahtevu.
      */
     private static boolean isInterbankPath(String uri) {
+        // FE wrapper rute — preskoci, JwtAuthenticationFilter ce ih obraditi.
+        if (uri.startsWith("/interbank/otc")
+                || uri.startsWith("/interbank/payments")) {
+            return false;
+        }
         return uri.startsWith("/interbank")
                 || uri.startsWith("/public-stock")
                 || uri.startsWith("/negotiations")

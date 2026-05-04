@@ -79,7 +79,13 @@ public class InterbankOtcWrapperService {
 
     // ─── Discovery ────────────────────────────────────────────────────────────
 
-    @Transactional
+    // NOTE: NE koristimo @Transactional na ovoj metodi — radi HTTP pozive ka
+    // partner bankama (RestClient) koji mogu da bace RuntimeException ako
+    // partner nije dostupan. @Transactional + uhvacen RuntimeException ostavlja
+    // transakciju u "rollback-only" stanju, pa Spring TransactionManager kasnije
+    // baci UnexpectedRollbackException ("Transaction silently rolled back")
+    // i vrati klijentu 400. Bez @Transactional, catch radi gracefully — vraca
+    // listings od partnera koje SU dostupne, ignorise ostale.
     public List<OtcInterbankListing> listRemoteListings() {
         List<OtcInterbankListing> result = new ArrayList<>();
         for (InterbankProperties.PartnerBank partner : properties.getPartners()) {
