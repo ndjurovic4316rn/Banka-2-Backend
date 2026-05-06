@@ -45,6 +45,13 @@ services:
       PGUSER: banka2user
       PRIMARY_HOST: db
       PRIMARY_PORT: "5432"
+      # Primary admin kredencijali — koriste se SAMO ako bootstrap script otkrije
+      # da replication user/slot ne postoje na primary-ju (samo-ozdravnja kad je
+      # raniji boot primary-ja pao na CRLF/bash^M init scriptu i propustio da
+      # ih kreira). Vidi bootstrap-replica.sh `ensure_replication_setup`.
+      PRIMARY_DB: banka2
+      PRIMARY_USER: banka2user
+      PRIMARY_PASSWORD: banka2pass
       REPLICATION_USER: replicator
       REPLICATION_PASSWORD: replicator_pass
       REPLICATION_SLOT: banka2_replica_slot
