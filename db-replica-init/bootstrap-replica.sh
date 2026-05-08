@@ -48,6 +48,24 @@ ensure_replication_setup() {
 EOSQL
 
     echo "[replica-init] Replication user + slot OK."
+
+    # Self-healing pg_hba.conf — primary mora imati 'host replication ...' pravilo
+    # da bi prihvatio konekcije od replicator user-a. Ako 01-replication-setup.sh
+    # nije zavrsio (npr. CRLF/bash^M iz prvog boot-a), pg_hba nema entry pa
+    # pg_basebackup pada sa "no pg_hba.conf entry for replication connection".
+    #
+    # Koristi COPY ... TO PROGRAM (Postgres superuser feature za izvrsavanje
+    # shell komandi na server side) da idempotentno doda entry — grep -q proverava
+    # da li vec postoji, ako ne, tee -a dopise. SELECT pg_reload_conf() reload-uje
+    # config bez restart-a. Banka2user je SUPERUSER (docker-entrypoint to default-uje
+    # za POSTGRES_USER), pa ima privilegiju da pokrene COPY TO PROGRAM.
+    echo "[replica-init] Provera pg_hba.conf entry-ja na primary-ju..."
+    PGPASSWORD="$PRIMARY_PASSWORD" psql -h "$PRIMARY_HOST" -p "$PRIMARY_PORT" -U "$PRIMARY_USER" -d "$PRIMARY_DB" -v ON_ERROR_STOP=1 <<-EOSQL
+        COPY (SELECT 'host    replication    $REPLICATION_USER    172.16.0.0/12    md5')
+        TO PROGRAM 'grep -qE "^host[[:space:]]+replication[[:space:]]+$REPLICATION_USER" \$PGDATA/pg_hba.conf || tee -a \$PGDATA/pg_hba.conf >/dev/null';
+        SELECT pg_reload_conf();
+EOSQL
+    echo "[replica-init] pg_hba.conf OK (entry dodat ili vec postoji), config reload-ovan."
 }
 
 if [ ! -s "$DATA_DIR/PG_VERSION" ]; then
