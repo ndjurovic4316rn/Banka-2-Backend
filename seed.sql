@@ -2556,3 +2556,14 @@ WHERE f.name = 'Banka 2 Tech Growth'
         AND p.user_id = (SELECT id FROM clients WHERE email = 'banka2.doo@banka.rs')
         AND p.user_role = 'CLIENT'
   );
+
+-- ============================================================
+-- SEQUENCE RESET — posle eksplicitnih ID INSERT-ova, sequence
+-- mora da se sinhronizuje sa MAX(id) iz svake tabele, inace
+-- sledeci Hibernate auto-generated INSERT pokusava ID koji
+-- vec postoji (companies/currencies imaju eksplicitne ID-eve).
+-- Bag prijavljen 10.05.2026 vece-2 (C2 Sc 4).
+-- ============================================================
+
+SELECT setval('companies_id_seq', (SELECT COALESCE(MAX(id), 1) FROM companies));
+SELECT setval('currencies_id_seq', (SELECT COALESCE(MAX(id), 1) FROM currencies));

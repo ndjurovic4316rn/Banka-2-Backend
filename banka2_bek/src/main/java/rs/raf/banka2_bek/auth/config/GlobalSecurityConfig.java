@@ -86,6 +86,12 @@ public class GlobalSecurityConfig  {
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/cards/requests/*/reject").hasAnyRole("ADMIN", "EMPLOYEE")
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/cards/requests").hasAnyRole("ADMIN", "EMPLOYEE")
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/loans/requests/my").authenticated()
+                        // Spec Celina 2 §33: klijent moze da podnese zahtev za kredit
+                        // (POST /loans). Approve/reject ostaje ADMIN/EMPLOYEE preko
+                        // PATCH /loans/requests/* ruta dole.
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/loans").authenticated()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/loans/*/early-repayment").authenticated()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/loans/my").authenticated()
                         .requestMatchers("/loans/requests/**").hasAnyRole("ADMIN", "EMPLOYEE")
                         .requestMatchers(org.springframework.http.HttpMethod.GET,"/orders").hasAnyRole("ADMIN", "EMPLOYEE")
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/listings/refresh").hasAnyRole("ADMIN", "EMPLOYEE")

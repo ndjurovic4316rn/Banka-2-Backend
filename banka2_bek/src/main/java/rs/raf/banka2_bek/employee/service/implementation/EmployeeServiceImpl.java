@@ -103,6 +103,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .map(this::toResponse);
     }
 
+    @Transactional
     public EmployeeResponseDto updateEmployee(Long id, UpdateEmployeeRequestDto request) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Employee with ID " + id + " not found."));
@@ -186,6 +187,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .orElse(fallbackId);
     }
 
+    @Transactional
     public void deactivateEmployee(Long id) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Employee with ID " + id + " not found."));
