@@ -65,6 +65,7 @@ public class InvestmentFundService {
     private final FundValueCalculator fundValueCalculator;
     private final FundLiquidationService fundLiquidationService;
     private final CurrencyConversionService currencyConversionService;
+    private final rs.raf.banka2_bek.investmentfund.scheduler.FundValueSnapshotScheduler fundValueSnapshotScheduler;
 
     /**
      * T12 — fallback strategija za "Banka kao klijent fonda" (Celina 4 (Nova) §4406-4435).
@@ -364,6 +365,11 @@ public class InvestmentFundService {
         log.info("T8 invest completed: fund={}, investor={}#{}, amountRsd={}, sourceAccount={}",
                 fund.getId(), investor.userRole(), investor.userId(), amounts.amountRsd(), sourceAccount.getId());
 
+        // Bag prijavljen 10.05.2026: FundDetailsPage performance graf prazan jer
+        // fund_value_snapshots nema red za danas. Posle uspesne uplate, zovem
+        // idempotentni helper koji garantuje 1 tacku grafa za novu vrednost.
+        fundValueSnapshotScheduler.snapshotFundIfMissing(fund);
+
         BigDecimal fundValue = safeCompute(() -> fundValueCalculator.computeFundValue(fund), BigDecimal.ZERO);
         BigDecimal sumInvested = clientFundPositionRepository.findByFundId(fund.getId()).stream()
                 .map(ClientFundPosition::getTotalInvested)
@@ -448,6 +454,9 @@ public class InvestmentFundService {
             log.info("T8 withdraw pending: fund={}, investor={}#{}, amountRsd={}, shortfall={}",
                     fund.getId(), investor.userRole(), investor.userId(), amountRsd, shortfall);
         }
+
+        // Bag 10.05.2026 — vidi #invest hook iznad (snapshot za danas).
+        fundValueSnapshotScheduler.snapshotFundIfMissing(fund);
 
         return toClientFundTransactionDto(tx, fund.getName());
     }

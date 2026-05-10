@@ -65,6 +65,7 @@ class InvestmentFundServiceT8UnitTest {
     @Mock private FundValueCalculator fundValueCalculator;
     @Mock private FundLiquidationService fundLiquidationService;
     @Mock private CurrencyConversionService currencyConversionService;
+    @Mock private rs.raf.banka2_bek.investmentfund.scheduler.FundValueSnapshotScheduler fundValueSnapshotScheduler;
 
     @InjectMocks
     private InvestmentFundService service;
