@@ -101,7 +101,7 @@ public class GlobalSecurityConfig  {
                         .requestMatchers(HttpMethod.GET, "/orders/{id}").authenticated()
                         .requestMatchers("/orders/*/approve", "/orders/*/decline").hasAnyRole("ADMIN", "EMPLOYEE")
                         .requestMatchers("/portfolio/**").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/tax/my").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/tax/my", "/tax/my/breakdown").authenticated()
                         .requestMatchers("/tax/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN", "SUPERVISOR")
                         .requestMatchers(HttpMethod.GET, "/exchanges", "/exchanges/**").permitAll()
                         .requestMatchers(HttpMethod.PATCH, "/exchanges/*/test-mode").hasAnyRole("ADMIN", "EMPLOYEE")
