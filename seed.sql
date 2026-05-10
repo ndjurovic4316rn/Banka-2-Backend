@@ -329,7 +329,13 @@ VALUES
      3000.0000, 28000.0000,
      255.0000, '2031-03-15', 'ACTIVE', 'Lični račun', NOW()),
 
-    ('222000112345678914', 'BUSINESS', 'STANDARD', 8, 2, 1, 2,
+    -- Poslovni racun MORA imati samo company_id, ne client_id (Account
+    -- ima @AssertTrue isOwnerValid() XOR validaciju). Milica je
+    -- AuthorizedPerson preko `authorized_persons` tabele, ne direktan
+    -- vlasnik. Bag prijavljen 10.05.2026 vece-3 — pre fix-a, svaki update
+    -- ovog racuna je pucao sa "Racun mora imati vlasnika: ili klijenta
+    -- ili kompaniju, ali ne oba".
+    ('222000112345678914', 'BUSINESS', 'STANDARD', 8, NULL, 1, 2,
      1250000.0000, 1230000.0000,
      1000000.0000, 5000000.0000,
      20000.0000, 350000.0000,
