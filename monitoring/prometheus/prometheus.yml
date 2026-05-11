@@ -32,7 +32,7 @@ scrape_configs:
     scrape_interval: 15s
     static_configs:
       - targets:
-          - banka2_backend:8080
+          - backend:8080
         labels:
           service: backend
           tier: api
