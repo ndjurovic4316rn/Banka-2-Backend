@@ -120,6 +120,14 @@ services:
       # bean-a (nije Optional). Sa capacity=100k filter je no-op u praksi.
       AUTH_RATE_LIMIT_ENABLED: ${AUTH_RATE_LIMIT_ENABLED:-true}
       AUTH_RATE_LIMIT_CAPACITY: ${AUTH_RATE_LIMIT_CAPACITY:-100000}
+      # Inter-bank protokol — Banka 1 (Tim 1) base URL. Tim 1 izlaze
+      # nginx gateway na host portu 80. Iz nasi backend container-a
+      # pristupamo preko host.docker.internal alias-a (extra_hosts).
+      PARTNER1_BASE_URL: ${PARTNER1_BASE_URL:-http://host.docker.internal/}
+      # Tim 1 user info endpoint je rerouted na /interbank/user/{rn}/{id}.
+      PARTNER1_USER_PATH: ${PARTNER1_USER_PATH:-/interbank/user/{rn}/{id}}
+      # Tim 1 routing broj
+      PARTNER1_ROUTING: ${PARTNER1_ROUTING:-111}
     # host.docker.internal alias za pristup host portovima (Linux native Docker
     # zahteva eksplicitan host-gateway alias; Docker Desktop ima nativno).
     # Koristi se SAMO za opcioni Arbitro stack u Banka-2-Tools/docker-compose.yml
