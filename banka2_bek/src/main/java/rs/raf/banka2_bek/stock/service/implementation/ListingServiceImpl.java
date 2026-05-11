@@ -304,7 +304,9 @@ public class ListingServiceImpl implements ListingService {
 
             // Time-series tick u InfluxDB. ObjectProvider gracefuly vraca null
             // ako banka2.influx.enabled=false (BE i dalje radi bez Influx-a).
-            ListingPriceRecorder recorder = priceRecorderProvider.getIfAvailable();
+            // Null check za testove koji konstrukcijom rucnim ne prosledjuju provider.
+            ListingPriceRecorder recorder = priceRecorderProvider != null
+                    ? priceRecorderProvider.getIfAvailable() : null;
             if (recorder != null) {
                 BigDecimal high = currentPrice.max(newPrice);
                 BigDecimal low  = currentPrice.min(newPrice);
