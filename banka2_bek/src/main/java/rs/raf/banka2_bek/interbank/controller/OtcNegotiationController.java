@@ -1,7 +1,6 @@
 package rs.raf.banka2_bek.interbank.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -71,31 +70,31 @@ public class OtcNegotiationController {
     }
 
     /**
-     * §3.6 — sinhrono prihvatanje. Vraca 200 tek kad je 2PC committed.
-     * Greska u 2PC se manifestuje kao izuzetak → 4xx/5xx u InterbankExceptionHandler-u.
+     * §3.6 — sinhrono prihvatanje. Vraca 204 No Content tek kad je 2PC committed
+     * (spec §3.6: "Response: Empty (204 No Content)"). Greska u 2PC se manifestuje
+     * kao izuzetak → 4xx/5xx u InterbankExceptionHandler-u.
      */
     @GetMapping("/negotiations/{routingNumber}/{id}/accept")
     public ResponseEntity<Void> acceptNegotiation(
             @PathVariable int routingNumber,
             @PathVariable String id) {
         negotiationService.acceptReceivedNegotiation(new ForeignBankId(routingNumber, id));
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     /**
-     * §3.7 — friendly ime za nas lokalni id. Ako routingNumber nije nas — 404
-     * (mi nismo autoritativni za stranu banku).
+     * §3.7 — friendly ime za nas lokalni id. 404 Not Found ako id ne postoji
+     * (InterbankUserNotFoundException -> 404 kroz exception handler).
      */
     @GetMapping("/user/{routingNumber}/{id}")
     public ResponseEntity<UserInformation> getUserInfo(
             @PathVariable int routingNumber,
             @PathVariable String id) {
-        // Ako routingNumber != nas, vrati 404 — mi ne mozemo da vratimo info za drugu banku.
-        // serveUserInfo() proverava lokalnu validnost; ako routingNumber nije nas, nema id-a u nasoj bazi.
-        try {
-            return ResponseEntity.ok(negotiationService.serveUserInfo(id));
-        } catch (rs.raf.banka2_bek.interbank.exception.InterbankExceptions.InterbankProtocolException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        // Spec §3.7: ako routingNumber nije nas, 404 (mi nismo autoritativni za stranu banku).
+        if (routingNumber != negotiationService.requireMyRouting()) {
+            throw new rs.raf.banka2_bek.interbank.exception.InterbankExceptions
+                    .InterbankUserNotFoundException("routingNumber " + routingNumber + " nije nas");
         }
+        return ResponseEntity.ok(negotiationService.serveUserInfo(id));
     }
 }

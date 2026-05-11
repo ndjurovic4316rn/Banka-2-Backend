@@ -43,6 +43,21 @@ public class InterbankProperties {
     }
 
     public Optional<PartnerBank> findByApiKey(String apiKey) {
-        return partners.stream().filter(p -> p.getInboundToken().equals(apiKey)).findFirst();
+        if (apiKey == null || apiKey.isBlank()) {
+            return Optional.empty();
+        }
+        return partners.stream()
+                .filter(p -> p.getInboundToken() != null && p.getInboundToken().equals(apiKey))
+                .findFirst();
+    }
+
+    /** Pronalazenje partnera po routing broju (npr. iz Posting/TxAccount). */
+    public Optional<PartnerBank> findByRoutingNumber(Integer routingNumber) {
+        if (routingNumber == null) {
+            return Optional.empty();
+        }
+        return partners.stream()
+                .filter(p -> routingNumber.equals(p.getRoutingNumber()))
+                .findFirst();
     }
 }

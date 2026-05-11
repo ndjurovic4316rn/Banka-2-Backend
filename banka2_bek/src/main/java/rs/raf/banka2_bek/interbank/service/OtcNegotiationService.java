@@ -153,10 +153,20 @@ public class OtcNegotiationService {
         log.info("OTC outbound: accepted negotiation {}", negotiationId);
     }
 
+    /**
+     * Outbound §3.7 — graceful fallback ako partner banka vrati 404.
+     * UI moze da prikaze opaque id umesto imena ako nema friendly mapiranja.
+     */
     @Transactional
     public UserInformation resolveUserName(ForeignBankId userId) {
         if (userId == null) throw new IllegalArgumentException("userId ne sme biti null");
-        return client.getUserInfo(userId);
+        try {
+            return client.getUserInfo(userId);
+        } catch (InterbankExceptions.InterbankUserNotFoundException notFound) {
+            log.debug("Partner bank {} doesn't have user {}: {}",
+                    userId.routingNumber(), userId.id(), notFound.getMessage());
+            return new UserInformation("Banka " + userId.routingNumber(), userId.id());
+        }
     }
 
     // ────────────────────────── inbound (T3) ──────────────────────────────────
@@ -308,8 +318,9 @@ public class OtcNegotiationService {
 
         InterbankOtcNegotiation entity = lookupByNegotiationId(negotiationId);
 
+        // §3.3 — zatvoreni pregovor: 409 Conflict (ne 400, nije malformed).
         if (!entity.isOngoing() || entity.getStatus() != InterbankOtcNegotiationStatus.ACTIVE) {
-            throw new InterbankExceptions.InterbankProtocolException(
+            throw new InterbankExceptions.InterbankNegotiationConflictException(
                     "Pregovor " + negotiationId + " nije aktivan (status=" + entity.getStatus() + ")");
         }
 
@@ -320,7 +331,8 @@ public class OtcNegotiationService {
         }
         if (updated.lastModifiedBy().routingNumber() == entity.getLastModifiedByRoutingNumber()
                 && updated.lastModifiedBy().id().equals(entity.getLastModifiedByIdString())) {
-            throw new InterbankExceptions.InterbankProtocolException(
+            // §3.3 — turn violation: 409 Conflict.
+            throw new InterbankExceptions.InterbankNegotiationConflictException(
                     "Nije turn pozivaoca — pregovor je poslednje izmenjen od strane "
                             + entity.getLastModifiedByRoutingNumber() + ":"
                             + entity.getLastModifiedByIdString());
@@ -430,8 +442,11 @@ public class OtcNegotiationService {
             throw new InterbankExceptions.InterbankProtocolException(
                     "Mi nismo seller u ovom pregovoru — accept moze samo na sellerovoj banci");
         }
-        if (entity.getSettlementDate().isBefore(LocalDate.now())) {
-            throw new InterbankExceptions.InterbankProtocolException(
+        // §3.6 — settlementDate validacija. Spec koristi OffsetDateTime; mi
+        // persistujemo kao LocalDate (start-of-day UTC). Poredimo UTC trenutni
+        // datum da izbegnemo edge case sa razlikom timezone-a izmedju banki.
+        if (entity.getSettlementDate().isBefore(LocalDate.now(ZoneOffset.UTC))) {
+            throw new InterbankExceptions.InterbankNegotiationConflictException(
                     "settlementDate je prosao — pregovor je istekao");
         }
 
@@ -526,17 +541,24 @@ public class OtcNegotiationService {
     @Transactional(readOnly = true)
     public UserInformation serveUserInfo(String localUserId) {
         if (localUserId == null || localUserId.isBlank()) {
-            throw new IllegalArgumentException("localUserId je obavezan");
+            throw new InterbankExceptions.InterbankUserNotFoundException("localUserId je prazan");
         }
 
-        LocalParty p = parseLocalPartyId(localUserId);
+        LocalParty p;
+        try {
+            p = parseLocalPartyId(localUserId);
+        } catch (IllegalArgumentException malformed) {
+            // §3.7 — opaque ID koji ne razumemo se tretira kao "not found", ne kao 400.
+            throw new InterbankExceptions.InterbankUserNotFoundException(
+                    "Nepoznat id format: " + localUserId);
+        }
         String myDisplay = properties.getMyBankDisplayName();
         if (myDisplay == null || myDisplay.isBlank()) myDisplay = "Banka 2";
 
         if ("CLIENT".equals(p.role())) {
             Optional<Client> cOpt = clientRepository.findById(p.userId());
             if (cOpt.isEmpty()) {
-                throw new InterbankExceptions.InterbankProtocolException(
+                throw new InterbankExceptions.InterbankUserNotFoundException(
                         "Klijent " + p.userId() + " ne postoji");
             }
             Client c = cOpt.get();
@@ -545,7 +567,7 @@ public class OtcNegotiationService {
         } else {
             Optional<Employee> eOpt = employeeRepository.findById(p.userId());
             if (eOpt.isEmpty()) {
-                throw new InterbankExceptions.InterbankProtocolException(
+                throw new InterbankExceptions.InterbankUserNotFoundException(
                         "Zaposleni " + p.userId() + " ne postoji");
             }
             Employee e = eOpt.get();
@@ -599,6 +621,11 @@ public class OtcNegotiationService {
                     "interbank.my-routing-number nije konfigurisan u properties.");
         }
         return myRouting;
+    }
+
+    /** Public accessor — kontroleri koriste za §3.7 validaciju routingNumber-a. */
+    public int requireMyRouting() {
+        return requireMyRoutingNumber();
     }
 
     private InterbankOtcNegotiation lookupByNegotiationId(ForeignBankId negotiationId) {

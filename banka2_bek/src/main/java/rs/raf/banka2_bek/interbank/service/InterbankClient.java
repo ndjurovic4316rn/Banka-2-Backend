@@ -289,6 +289,11 @@ public class InterbankClient {
                                 if (res.getStatusCode().value() == 401)
                                     throw new InterbankExceptions.InterbankAuthException(
                                             "Invalid API key for routing " + userId.routingNumber() + ".");
+                                // §3.7 — 404 nije fatalno, samo nedostatak imena. Bacamo poseban tip
+                                // da caller moze graceful fallback (prikazi opaque id u UI-u).
+                                if (res.getStatusCode().value() == 404)
+                                    throw new InterbankExceptions.InterbankUserNotFoundException(
+                                            "User " + userId + " not found at partner bank");
                                 throw new InterbankExceptions.InterbankCommunicationException(
                                         "HTTP " + res.getStatusCode().value()
                                                 + " from user " + userId + " on GET");
