@@ -2564,6 +2564,106 @@ WHERE f.name = 'Banka 2 Tech Growth'
   );
 
 -- ============================================================
+-- INTER-BANK HANDSHAKE TEST SEED (Celina 5 — Tim 1 / Tim 2 razmena)
+-- ============================================================
+-- Dodatni racuni i klijent za inter-bank protokol handshake test
+-- sa Tim 1. Dodato 11.05.2026 posle dogovora sa Aleksom (Tim 1 BE).
+--
+-- Sta omogucava:
+-- 1) Stefan + Milica + Ana dobijaju USD racune — da mogu primati
+--    premium u USD od inter-bank kupca u OTC accept flow-u
+--    (OtcNegotiationService.resolveLocalAccount trazi seller-ov
+--    racun u valuti premium-a; bez USD racuna kupac iz Banka 1
+--    ne bi mogao da plati premium za AAPL/MSFT koji su u USD-u).
+-- 2) Novi klijent C-7 "Mile Interbank" sa svim 4 valutama
+--    (RSD/EUR/USD/CHF) — dedicated test target za Tim 1 handshake
+--    skripte. Iznosi po valuti dovoljni za sve 15 scenarija.
+-- 3) Stefan dodaje 8 javnih AAPL akcija (pored postojecih 10 MSFT)
+--    da Tim 1 ima vise scenarija u GET /public-stock odgovoru
+--    (multi-seller per ticker).
+-- ============================================================
+
+-- 1) Stefan USD racun (account_id ce biti auto-generisan, ne
+--    konflikira sa explicit-ID-evima 1-22 jer sequence se resetuje)
+INSERT INTO accounts (account_number, account_type, account_subtype, currency_id,
+                      client_id, company_id, employee_id,
+                      balance, available_balance,
+                      daily_limit, monthly_limit,
+                      daily_spending, monthly_spending,
+                      maintenance_fee, expiration_date, status, name, created_at)
+VALUES
+    -- Stefan USD: 2500 USD pocetno stanje, za primanje premium-a od Tim 1 kupca
+    ('222000131234567811', 'FOREIGN', 'STANDARD', 3, 1, NULL, 1,
+     2500.0000, 2500.0000, 5000.0000, 50000.0000,
+     0.0000, 0.0000, 0.0000, '2030-01-01', 'ACTIVE', 'Stefan USD', NOW()),
+    -- Milica USD: 1800 USD pocetno, isto pravilo
+    ('222000131234567812', 'FOREIGN', 'STANDARD', 3, 2, NULL, 1,
+     1800.0000, 1800.0000, 5000.0000, 50000.0000,
+     0.0000, 0.0000, 0.0000, '2030-01-01', 'ACTIVE', 'Milica USD', NOW()),
+    -- Ana USD: 950 USD pocetno
+    ('222000131234567813', 'FOREIGN', 'STANDARD', 3, 4, NULL, 1,
+     950.0000, 950.0000, 5000.0000, 50000.0000,
+     0.0000, 0.0000, 0.0000, '2030-01-01', 'ACTIVE', 'Ana USD', NOW());
+
+-- 2) Mile Interbank — dedicated handshake test klijent (C-7)
+INSERT INTO clients (first_name, last_name, date_of_birth, gender, email, phone, address,
+                     password, salt_password, active, created_at)
+SELECT 'Mile', 'Interbank', '1992-03-20', 'M', 'mile.interbank@banka.rs',
+       '+381 65 777 8899', 'Inter-Bank Test 1, Beograd',
+       '$2b$10$FUjcSzK7CZKeX53YVU4JjeOIXLt5axbipO85OlQqw5Dopg47zfgRG',
+       'c2VlZF9pbnRlcmJhbmtf', 1, NOW()
+WHERE NOT EXISTS (
+    SELECT 1 FROM clients WHERE email = 'mile.interbank@banka.rs'
+);
+
+-- 3) Mile Interbank racuni — sve 4 osnovne valute, visoki balance-ovi
+--    Tim 1 koristi `222000177777777XXX` prefix za njega da bude
+--    lako prepoznatljiv u test scriptama.
+INSERT INTO accounts (account_number, account_type, account_subtype, currency_id,
+                      client_id, company_id, employee_id,
+                      balance, available_balance,
+                      daily_limit, monthly_limit,
+                      daily_spending, monthly_spending,
+                      maintenance_fee, expiration_date, status, name, created_at)
+SELECT acc.account_number, acc.account_type, acc.account_subtype, acc.currency_id,
+       c.id, NULL, 1,
+       acc.balance, acc.balance,
+       acc.daily_limit, acc.monthly_limit,
+       0.0000, 0.0000, 0.0000, '2030-01-01', 'ACTIVE', acc.name, NOW()
+FROM clients c
+CROSS JOIN (VALUES
+    ('222000177777777811', 'CHECKING', 'STANDARD', 8, 5000000.0000, 1000000.0000, 10000000.0000, 'Mile Interbank RSD'),
+    ('222000177777777821', 'FOREIGN',  'STANDARD', 1,   50000.0000,   10000.0000,   100000.0000, 'Mile Interbank EUR'),
+    ('222000177777777831', 'FOREIGN',  'STANDARD', 3,   50000.0000,   10000.0000,   100000.0000, 'Mile Interbank USD'),
+    ('222000177777777841', 'FOREIGN',  'STANDARD', 2,   50000.0000,   10000.0000,   100000.0000, 'Mile Interbank CHF')
+) AS acc(account_number, account_type, account_subtype, currency_id, balance, daily_limit, monthly_limit, name)
+WHERE c.email = 'mile.interbank@banka.rs'
+  AND NOT EXISTS (
+      SELECT 1 FROM accounts WHERE account_number = acc.account_number
+  );
+
+-- 4) Mile Interbank javna portfolio pozicija — AAPL 100 sa public 25.
+--    Tim 1 moze da inicira /negotiations gde je Mile seller, sto je
+--    cleaner test od koriscenja Stefan (koji je takodje FE test klijent
+--    sa svojim postojecim ugovorima).
+INSERT INTO portfolios (user_id, user_role, listing_id, listing_ticker, listing_name, listing_type,
+                        quantity, average_buy_price, public_quantity, last_modified)
+SELECT c.id, 'CLIENT', l.id, l.ticker, l.name, 'STOCK', 100, 175.0000, 25, NOW()
+FROM clients c, listings l
+WHERE c.email = 'mile.interbank@banka.rs'
+  AND l.ticker = 'AAPL'
+  AND NOT EXISTS (
+      SELECT 1 FROM portfolios p
+      WHERE p.user_id = c.id AND p.user_role = 'CLIENT' AND p.listing_id = l.id
+  );
+
+-- 5) Stefan dobija AAPL javne — pored MSFT 10 public, sad i AAPL 8 public.
+--    Daje Tim 1 multi-ticker, multi-seller test scenarije (GET /public-stock
+--    sad vraca AAPL od dva sellera: C-1 Stefan + C-4 Ana + C-7 Mile).
+UPDATE portfolios SET public_quantity = 8, last_modified = NOW()
+WHERE user_id = 1 AND user_role = 'CLIENT' AND listing_ticker = 'AAPL';
+
+-- ============================================================
 -- SEQUENCE RESET — posle eksplicitnih ID INSERT-ova, sequence
 -- mora da se sinhronizuje sa MAX(id) iz svake tabele, inace
 -- sledeci Hibernate auto-generated INSERT pokusava ID koji
