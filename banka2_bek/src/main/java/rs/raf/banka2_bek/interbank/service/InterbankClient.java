@@ -277,10 +277,16 @@ public class InterbankClient {
      */
     public UserInformation getUserInfo(ForeignBankId userId) {
         InterbankProperties.PartnerBank partnerBank = resolvePartner(userId.routingNumber());
+        // §3.7 path je per-partner konfigurabilan: spec default je "/user/{rn}/{id}",
+        // ali Tim 1 ima override "/interbank/user/{rn}/{id}" (path collision sa FE rutom).
+        String pathTemplate = partnerBank.getUserInfoPath();
+        if (pathTemplate == null || pathTemplate.isBlank()) {
+            pathTemplate = "/user/{rn}/{id}";
+        }
         try {
             return restClient
                     .get()
-                    .uri(partnerBank.getBaseUrl() + "/user/{rn}/{id}",
+                    .uri(partnerBank.getBaseUrl() + pathTemplate,
                             userId.routingNumber(), userId.id())
                     .header("X-Api-Key", partnerBank.getOutboundToken())
                     .retrieve()

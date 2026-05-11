@@ -40,6 +40,19 @@ public class InterbankProperties {
 
         /** Token koji mi izdajemo partner banci; verifikujemo ga u X-Api-Key headeru. */
         private String inboundToken;
+
+        /**
+         * §3.7 GET /user path template — po spec-u je <code>/user/{rn}/{id}</code>,
+         * ali neki partneri (Tim 1) su rerouted-ovali endpoint na
+         * <code>/interbank/user/{rn}/{id}</code> zbog internih path collision-a sa
+         * frontend rutama. Default je per-spec; override po partneru u
+         * <code>application.properties</code>:
+         * <pre>interbank.partners[0].user-info-path=/interbank/user/{rn}/{id}</pre>
+         * Placeholderi <code>{rn}</code> i <code>{id}</code> ce biti zamenjeni od
+         * strane <code>InterbankClient.getUserInfo()</code> kroz RestClient URI
+         * template substitution.
+         */
+        private String userInfoPath = "/user/{rn}/{id}";
     }
 
     public Optional<PartnerBank> findByApiKey(String apiKey) {
