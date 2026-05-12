@@ -10,6 +10,11 @@ import java.util.Map;
 @ControllerAdvice(basePackages = "rs.raf.banka2_bek.savings.controller")
 public class SavingsExceptionHandler {
 
+    @ExceptionHandler(SavingsDepositNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleNotFound(SavingsDepositNotFoundException ex) {
+        return ResponseEntity.status(404).body(Map.of("message", ex.getMessage()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException ex) {
         return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));

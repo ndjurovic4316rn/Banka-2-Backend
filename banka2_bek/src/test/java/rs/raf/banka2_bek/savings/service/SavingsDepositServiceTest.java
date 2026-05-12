@@ -27,6 +27,9 @@ import rs.raf.banka2_bek.savings.dto.WithdrawEarlyDto;
 import rs.raf.banka2_bek.savings.entity.SavingsDeposit;
 import rs.raf.banka2_bek.savings.entity.SavingsDepositStatus;
 import rs.raf.banka2_bek.savings.entity.SavingsInterestRate;
+import rs.raf.banka2_bek.savings.entity.SavingsTransaction;
+import rs.raf.banka2_bek.savings.entity.SavingsTransactionType;
+import rs.raf.banka2_bek.savings.exception.SavingsDepositNotFoundException;
 import rs.raf.banka2_bek.savings.mapper.SavingsMapper;
 import rs.raf.banka2_bek.savings.repository.SavingsDepositRepository;
 import rs.raf.banka2_bek.savings.repository.SavingsTransactionRepository;
@@ -162,6 +165,49 @@ class SavingsDepositServiceTest {
     }
 
     @Test
+    void openDeposit_happyPath_rsd_12months_debitsSourceAndCreatesDeposit() {
+        when(userResolver.resolveCurrent()).thenReturn(new UserContext(1L, UserRole.CLIENT));
+        when(otpService.verify(anyString(), eq("123456"))).thenReturn(Map.of("verified", true));
+        when(accountRepo.findById(10L)).thenReturn(Optional.of(source));
+
+        SavingsInterestRate rate = SavingsInterestRate.builder()
+                .id(1L).currency(rsd).termMonths(12).annualRate(new BigDecimal("4.00"))
+                .active(true).effectiveFrom(LocalDate.now()).build();
+        when(rateService.findActive(1L, 12)).thenReturn(Optional.of(rate));
+
+        // depositRepo.save returns entity sa id-em postavljenim
+        when(depositRepo.save(any(SavingsDeposit.class))).thenAnswer(inv -> {
+            SavingsDeposit d = inv.getArgument(0);
+            d.setId(99L);
+            return d;
+        });
+        SavingsDepositDto outDto = SavingsDepositDto.builder().id(99L).principalAmount(new BigDecimal("100000")).build();
+        when(mapper.toDepositDto(any(SavingsDeposit.class))).thenReturn(outDto);
+
+        OpenDepositDto dto = OpenDepositDto.builder()
+                .sourceAccountId(10L).linkedAccountId(10L)
+                .principalAmount(new BigDecimal("100000"))
+                .termMonths(12)
+                .autoRenew(true).otpCode("123456")
+                .build();
+
+        SavingsDepositDto result = service.openDeposit(dto);
+
+        // Source account debituje za principal
+        assertThat(source.getBalance()).isEqualByComparingTo("400000");
+        assertThat(source.getAvailableBalance()).isEqualByComparingTo("400000");
+        verify(accountRepo).save(source);
+
+        // Deposit zapisan + audit transaction kreirana
+        verify(depositRepo).save(any(SavingsDeposit.class));
+        verify(txRepo).save(any(SavingsTransaction.class));
+
+        // Vraca DTO sa id-em
+        assertThat(result.getId()).isEqualTo(99L);
+        assertThat(result.getPrincipalAmount()).isEqualByComparingTo("100000");
+    }
+
+    @Test
     void openDeposit_insufficientBalance_throws() {
         when(userResolver.resolveCurrent()).thenReturn(new UserContext(1L, UserRole.CLIENT));
         when(otpService.verify(anyString(), eq("123456"))).thenReturn(Map.of("verified", true));
@@ -242,6 +288,70 @@ class SavingsDepositServiceTest {
     // -----------------------------------------------------------------------
     // withdrawEarly
     // -----------------------------------------------------------------------
+
+    @Test
+    void getDeposit_notFound_throws404() {
+        when(depositRepo.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getDeposit(999L))
+                .isInstanceOf(SavingsDepositNotFoundException.class)
+                .hasMessageContaining("999");
+    }
+
+    @Test
+    void withdrawEarly_happyPath_returnsPrincipalMinusPenaltyAndPenaltyToBank() {
+        SavingsDeposit d = SavingsDeposit.builder()
+                .id(1L).clientId(1L).linkedAccountId(10L)
+                .principalAmount(new BigDecimal("100000"))
+                .currency(rsd).termMonths(12)
+                .annualInterestRate(new BigDecimal("4.00"))
+                .startDate(LocalDate.now()).maturityDate(LocalDate.now().plusMonths(12))
+                .nextInterestPaymentDate(LocalDate.now().plusMonths(1))
+                .totalInterestPaid(BigDecimal.ZERO)
+                .autoRenew(false).status(SavingsDepositStatus.ACTIVE).build();
+        when(depositRepo.findById(1L)).thenReturn(Optional.of(d));
+        when(userResolver.resolveCurrent()).thenReturn(new UserContext(1L, UserRole.CLIENT));
+        when(otpService.verify(anyString(), eq("123456"))).thenReturn(Map.of("verified", true));
+
+        Account linked = new Account();
+        linked.setId(10L);
+        linked.setBalance(new BigDecimal("5000"));
+        linked.setAvailableBalance(new BigDecimal("5000"));
+        linked.setCurrency(rsd);
+        when(accountRepo.findForUpdateById(10L)).thenReturn(Optional.of(linked));
+
+        Account bankAccount = new Account();
+        bankAccount.setId(100L);
+        bankAccount.setBalance(new BigDecimal("1000000"));
+        bankAccount.setAvailableBalance(new BigDecimal("1000000"));
+        bankAccount.setCurrency(rsd);
+        when(accountRepo.findBankAccountByCurrencyId("22200022", 1L)).thenReturn(Optional.of(bankAccount));
+
+        when(depositRepo.save(d)).thenReturn(d);
+        SavingsDepositDto outDto = SavingsDepositDto.builder().id(1L).status("WITHDRAWN_EARLY").build();
+        when(mapper.toDepositDto(d)).thenReturn(outDto);
+
+        WithdrawEarlyDto dto = new WithdrawEarlyDto();
+        dto.setOtpCode("123456");
+
+        SavingsDepositDto result = service.withdrawEarly(1L, dto);
+
+        // Penal = 100000 * 0.01 = 1000.0000
+        // Vracen iznos = 100000 - 1000 = 99000
+        // Linked account: 5000 + 99000 = 104000
+        assertThat(linked.getBalance()).isEqualByComparingTo("104000");
+        assertThat(linked.getAvailableBalance()).isEqualByComparingTo("104000");
+
+        // Bankin racun: 1000000 + 1000 = 1001000
+        assertThat(bankAccount.getBalance()).isEqualByComparingTo("1001000");
+
+        assertThat(d.getStatus()).isEqualTo(SavingsDepositStatus.WITHDRAWN_EARLY);
+        verify(txRepo, times(2)).save(any(SavingsTransaction.class)); // PRINCIPAL + PENALTY
+        verify(accountRepo).save(linked);
+        verify(accountRepo).save(bankAccount);
+
+        assertThat(result.getStatus()).isEqualTo("WITHDRAWN_EARLY");
+    }
 
     @Test
     void withdrawEarly_notActive_throws() {

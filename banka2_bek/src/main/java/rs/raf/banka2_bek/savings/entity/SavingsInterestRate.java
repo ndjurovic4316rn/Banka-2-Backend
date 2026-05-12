@@ -11,7 +11,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "savings_interest_rates")
+@Table(
+    name = "savings_interest_rates",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_savings_rates_currency_term_active",
+        columnNames = {"currency_id", "term_months", "active"}
+    )
+)
 @Getter @Setter
 @NoArgsConstructor
 @AllArgsConstructor

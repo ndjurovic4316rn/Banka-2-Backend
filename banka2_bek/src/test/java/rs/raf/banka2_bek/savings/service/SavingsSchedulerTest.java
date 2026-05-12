@@ -6,37 +6,31 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import rs.raf.banka2_bek.account.model.Account;
-import rs.raf.banka2_bek.account.repository.AccountRepository;
 import rs.raf.banka2_bek.currency.model.Currency;
 import rs.raf.banka2_bek.savings.entity.SavingsDeposit;
 import rs.raf.banka2_bek.savings.entity.SavingsDepositStatus;
-import rs.raf.banka2_bek.savings.entity.SavingsInterestRate;
-import rs.raf.banka2_bek.savings.entity.SavingsTransaction;
 import rs.raf.banka2_bek.savings.repository.SavingsDepositRepository;
-import rs.raf.banka2_bek.savings.repository.SavingsTransactionRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SavingsSchedulerTest {
 
     @Mock SavingsDepositRepository depositRepo;
-    @Mock SavingsTransactionRepository txRepo;
-    @Mock SavingsInterestRateService rateService;
-    @Mock AccountRepository accountRepo;
+    @Mock SavingsDepositProcessor processor;
     @InjectMocks SavingsScheduler scheduler;
 
     private Currency rsd;
     private SavingsDeposit deposit;
-    private Account linked;
 
     @BeforeEach
     void setUp() {
@@ -55,58 +49,6 @@ class SavingsSchedulerTest {
                 .totalInterestPaid(BigDecimal.ZERO)
                 .autoRenew(false)
                 .status(SavingsDepositStatus.ACTIVE).build();
-
-        linked = new Account();
-        linked.setId(10L);
-        linked.setBalance(new BigDecimal("1000"));
-        linked.setAvailableBalance(new BigDecimal("1000"));
-        linked.setCurrency(rsd);
-    }
-
-    @Test
-    void payMonthlyInterest_creditsLinkedAndUpdatesNextDate() {
-        when(accountRepo.findForUpdateById(10L)).thenReturn(Optional.of(linked));
-        when(accountRepo.save(linked)).thenReturn(linked);
-        when(depositRepo.save(deposit)).thenReturn(deposit);
-
-        scheduler.payMonthlyInterest(deposit, LocalDate.of(2026, 6, 12));
-
-        // 100000 * 4.00 / 1200 = 333.3333
-        assertThat(linked.getBalance()).isEqualByComparingTo("1333.3333");
-        assertThat(linked.getAvailableBalance()).isEqualByComparingTo("1333.3333");
-        assertThat(deposit.getNextInterestPaymentDate()).isEqualTo(LocalDate.of(2026, 7, 12));
-        assertThat(deposit.getTotalInterestPaid()).isEqualByComparingTo("333.3333");
-        verify(txRepo).save(any(SavingsTransaction.class));
-    }
-
-    @Test
-    void returnPrincipal_setsStatusMatured() {
-        when(accountRepo.findForUpdateById(10L)).thenReturn(Optional.of(linked));
-        when(accountRepo.save(linked)).thenReturn(linked);
-        when(depositRepo.save(deposit)).thenReturn(deposit);
-
-        scheduler.returnPrincipal(deposit, LocalDate.of(2027, 5, 12));
-
-        assertThat(deposit.getStatus()).isEqualTo(SavingsDepositStatus.MATURED);
-        // 1000 + 100000 = 101000
-        assertThat(linked.getBalance()).isEqualByComparingTo("101000");
-        verify(txRepo).save(any(SavingsTransaction.class));
-    }
-
-    @Test
-    void renewDeposit_createsNewWithCurrentRate() {
-        SavingsInterestRate currentRate = SavingsInterestRate.builder()
-                .id(2L).currency(rsd).termMonths(12).annualRate(new BigDecimal("4.50"))
-                .active(true).effectiveFrom(LocalDate.now()).build();
-        when(rateService.findActive(1L, 12)).thenReturn(Optional.of(currentRate));
-        when(depositRepo.save(any(SavingsDeposit.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        scheduler.renewDeposit(deposit, LocalDate.of(2027, 5, 12));
-
-        assertThat(deposit.getStatus()).isEqualTo(SavingsDepositStatus.RENEWED);
-        // old (status RENEWED) + new deposit = 2 saves
-        verify(depositRepo, times(2)).save(any(SavingsDeposit.class));
-        verify(txRepo).save(any(SavingsTransaction.class));
     }
 
     @Test
@@ -120,51 +62,78 @@ class SavingsSchedulerTest {
 
         scheduler.runSavingsCycle();
 
-        verify(txRepo, never()).save(any());
+        verify(processor, never()).payMonthlyInterest(any(), any());
+        verify(processor, never()).returnPrincipal(any(), any());
+        verify(processor, never()).renewDeposit(any(), any());
     }
 
     @Test
-    void runSavingsCycle_autoRenew_callsRenew() {
+    void runSavingsCycle_invokesPayMonthlyInterestForDueDeposits() {
+        when(depositRepo.findByStatusAndNextInterestPaymentDateLessThanEqual(
+                eq(SavingsDepositStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(deposit));
+        when(depositRepo.findByStatusAndMaturityDateLessThanEqual(
+                eq(SavingsDepositStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of());
+
+        scheduler.runSavingsCycle();
+
+        verify(processor, times(1)).payMonthlyInterest(eq(deposit), any(LocalDate.class));
+        verify(processor, never()).returnPrincipal(any(), any());
+        verify(processor, never()).renewDeposit(any(), any());
+    }
+
+    @Test
+    void runSavingsCycle_autoRenew_callsRenewOnProcessor() {
         deposit.setAutoRenew(true);
-        deposit.setMaturityDate(LocalDate.now().minusDays(1));
-
-        SavingsInterestRate rate = SavingsInterestRate.builder()
-                .id(2L).currency(rsd).termMonths(12).annualRate(new BigDecimal("4.00"))
-                .active(true).effectiveFrom(LocalDate.now()).build();
-
         when(depositRepo.findByStatusAndNextInterestPaymentDateLessThanEqual(
                 any(SavingsDepositStatus.class), any(LocalDate.class)))
                 .thenReturn(List.of());
         when(depositRepo.findByStatusAndMaturityDateLessThanEqual(
-                any(SavingsDepositStatus.class), any(LocalDate.class)))
+                eq(SavingsDepositStatus.ACTIVE), any(LocalDate.class)))
                 .thenReturn(List.of(deposit));
-        when(rateService.findActive(1L, 12)).thenReturn(Optional.of(rate));
-        when(depositRepo.save(any(SavingsDeposit.class))).thenAnswer(inv -> inv.getArgument(0));
 
         scheduler.runSavingsCycle();
 
-        assertThat(deposit.getStatus()).isEqualTo(SavingsDepositStatus.RENEWED);
-        verify(txRepo, times(1)).save(any(SavingsTransaction.class));
+        verify(processor, times(1)).renewDeposit(eq(deposit), any(LocalDate.class));
+        verify(processor, never()).returnPrincipal(any(), any());
     }
 
     @Test
-    void runSavingsCycle_notAutoRenew_callsReturnPrincipal() {
+    void runSavingsCycle_notAutoRenew_callsReturnPrincipalOnProcessor() {
         deposit.setAutoRenew(false);
-        deposit.setMaturityDate(LocalDate.now().minusDays(1));
-
         when(depositRepo.findByStatusAndNextInterestPaymentDateLessThanEqual(
                 any(SavingsDepositStatus.class), any(LocalDate.class)))
                 .thenReturn(List.of());
         when(depositRepo.findByStatusAndMaturityDateLessThanEqual(
-                any(SavingsDepositStatus.class), any(LocalDate.class)))
+                eq(SavingsDepositStatus.ACTIVE), any(LocalDate.class)))
                 .thenReturn(List.of(deposit));
-        when(accountRepo.findForUpdateById(10L)).thenReturn(Optional.of(linked));
-        when(accountRepo.save(linked)).thenReturn(linked);
-        when(depositRepo.save(deposit)).thenReturn(deposit);
 
         scheduler.runSavingsCycle();
 
-        assertThat(deposit.getStatus()).isEqualTo(SavingsDepositStatus.MATURED);
-        verify(txRepo, times(1)).save(any(SavingsTransaction.class));
+        verify(processor, times(1)).returnPrincipal(eq(deposit), any(LocalDate.class));
+        verify(processor, never()).renewDeposit(any(), any());
+    }
+
+    @Test
+    void runSavingsCycle_swallowsProcessorExceptions() {
+        when(depositRepo.findByStatusAndNextInterestPaymentDateLessThanEqual(
+                any(SavingsDepositStatus.class), any(LocalDate.class)))
+                .thenReturn(List.of(deposit));
+        when(depositRepo.findByStatusAndMaturityDateLessThanEqual(
+                any(SavingsDepositStatus.class), any(LocalDate.class)))
+                .thenReturn(List.of());
+
+        // throw runtime exception — scheduler treba da log-uje i nastavi
+        doThrowOnPayInterest();
+
+        scheduler.runSavingsCycle();
+
+        verify(processor, times(1)).payMonthlyInterest(eq(deposit), any(LocalDate.class));
+    }
+
+    private void doThrowOnPayInterest() {
+        org.mockito.Mockito.doThrow(new IllegalStateException("test"))
+                .when(processor).payMonthlyInterest(any(SavingsDeposit.class), any(LocalDate.class));
     }
 }

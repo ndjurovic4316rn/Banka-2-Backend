@@ -23,6 +23,7 @@ import rs.raf.banka2_bek.savings.entity.SavingsDepositStatus;
 import rs.raf.banka2_bek.savings.entity.SavingsInterestRate;
 import rs.raf.banka2_bek.savings.entity.SavingsTransaction;
 import rs.raf.banka2_bek.savings.entity.SavingsTransactionType;
+import rs.raf.banka2_bek.savings.exception.SavingsDepositNotFoundException;
 import rs.raf.banka2_bek.savings.mapper.SavingsMapper;
 import rs.raf.banka2_bek.savings.repository.SavingsDepositRepository;
 import rs.raf.banka2_bek.savings.repository.SavingsTransactionRepository;
@@ -163,7 +164,7 @@ public class SavingsDepositService {
     @Transactional(readOnly = true)
     public SavingsDepositDto getDeposit(Long id) {
         SavingsDeposit d = depositRepo.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Depozit ne postoji"));
+                .orElseThrow(() -> new SavingsDepositNotFoundException(id));
         UserContext me = userResolver.resolveCurrent();
         verifyDepositAccess(d, me);
         return mapper.toDepositDto(d);
@@ -172,7 +173,7 @@ public class SavingsDepositService {
     @Transactional(readOnly = true)
     public List<SavingsTransactionDto> listDepositTransactions(Long depositId) {
         SavingsDeposit d = depositRepo.findById(depositId)
-                .orElseThrow(() -> new IllegalArgumentException("Depozit ne postoji"));
+                .orElseThrow(() -> new SavingsDepositNotFoundException(depositId));
         UserContext me = userResolver.resolveCurrent();
         verifyDepositAccess(d, me);
         return txRepo.findByDepositIdOrderByCreatedAtDesc(depositId)
@@ -182,7 +183,7 @@ public class SavingsDepositService {
     @Transactional
     public SavingsDepositDto toggleAutoRenew(Long depositId, ToggleAutoRenewDto dto) {
         SavingsDeposit d = depositRepo.findById(depositId)
-                .orElseThrow(() -> new IllegalArgumentException("Depozit ne postoji"));
+                .orElseThrow(() -> new SavingsDepositNotFoundException(depositId));
         UserContext me = userResolver.resolveCurrent();
         verifyOwnership(d, me);
         if (d.getStatus() != SavingsDepositStatus.ACTIVE) {
@@ -195,7 +196,7 @@ public class SavingsDepositService {
     @Transactional
     public SavingsDepositDto withdrawEarly(Long depositId, WithdrawEarlyDto dto) {
         SavingsDeposit d = depositRepo.findById(depositId)
-                .orElseThrow(() -> new IllegalArgumentException("Depozit ne postoji"));
+                .orElseThrow(() -> new SavingsDepositNotFoundException(depositId));
         UserContext me = userResolver.resolveCurrent();
         verifyOwnership(d, me);
         if (d.getStatus() != SavingsDepositStatus.ACTIVE) {
