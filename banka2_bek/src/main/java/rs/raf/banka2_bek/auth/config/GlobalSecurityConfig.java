@@ -142,6 +142,17 @@ public class GlobalSecurityConfig  {
                                 .hasAuthority("ROLE_INTERBANK")
                         // Arbitro asistent — svi autentifikovani korisnici (klijenti + zaposleni)
                         .requestMatchers("/assistant/**").authenticated()
+                        // Stedna knjizica (Celina 2): klijentske rute su authenticated,
+                        // admin rute zahtevaju ADMIN ili SUPERVISOR rolu.
+                        // /admin/savings/** mora biti PRE anyRequest da uzme prednost.
+                        .requestMatchers(HttpMethod.POST, "/savings/deposits").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/savings/deposits/my").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/savings/deposits/*").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/savings/deposits/*/transactions").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/savings/deposits/*/auto-renew").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/savings/deposits/*/withdraw-early").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/savings/rates").authenticated()
+                        .requestMatchers("/admin/savings/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN", "SUPERVISOR")
                         .anyRequest().authenticated()
                 )
                 .formLogin(AbstractHttpConfigurer::disable)
