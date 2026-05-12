@@ -78,8 +78,13 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: db
       ADMINER_DESIGN: pepa-linha
+    # Adminer host port je env-driven (default 9001). Na Windows-u Hyper-V/WinNAT
+    # cesto rezervise 8568-9167 opseg (Bug 12.05.2026: "ports are not available...
+    # access permissions"). Default je 9001 jer to ima u CLAUDE.md istoriji,
+    # ali svako moze override-ovati preko env var-a (npr. ADMINER_HOST_PORT=9200
+    # za port iznad Hyper-V opsega).
     ports:
-      - "9001:8080"
+      - "${ADMINER_HOST_PORT:-9001}:8080"
 
   # Spring Boot backend
   backend:

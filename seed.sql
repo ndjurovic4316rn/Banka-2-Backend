@@ -2673,3 +2673,104 @@ WHERE user_id = 1 AND user_role = 'CLIENT' AND listing_ticker = 'AAPL';
 
 SELECT setval('companies_id_seq', (SELECT COALESCE(MAX(id), 1) FROM companies));
 SELECT setval('currencies_id_seq', (SELECT COALESCE(MAX(id), 1) FROM currencies));
+
+-- ============================================================
+-- STEDNJA (Celina 2 nadogradnja) — kamatne stope + demo deposits
+-- ============================================================
+
+-- 8 valuta x 5 rokova = 40 stopa (RSD/EUR/USD/CHF/GBP/CAD/AUD/JPY x 3/6/12/24/36 meseci)
+-- RSD: 2.5-5.0%, EUR/USD: 1.5-4.0%, CHF: 1.0-2.0%, GBP: 1.75-3.25%,
+-- CAD: 1.5-3.0%, AUD: 1.75-3.25%, JPY: 0.5-2.5%
+
+INSERT INTO savings_interest_rates (currency_id, term_months, annual_rate, active, effective_from, created_at) VALUES
+  ((SELECT id FROM currencies WHERE code='RSD'),  3, 2.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='RSD'),  6, 3.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='RSD'), 12, 4.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='RSD'), 24, 4.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='RSD'), 36, 5.00, 1, '2026-01-01', NOW()),
+
+  ((SELECT id FROM currencies WHERE code='EUR'),  3, 1.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='EUR'),  6, 2.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='EUR'), 12, 2.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='EUR'), 24, 3.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='EUR'), 36, 3.50, 1, '2026-01-01', NOW()),
+
+  ((SELECT id FROM currencies WHERE code='USD'),  3, 2.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='USD'),  6, 2.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='USD'), 12, 3.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='USD'), 24, 3.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='USD'), 36, 4.00, 1, '2026-01-01', NOW()),
+
+  ((SELECT id FROM currencies WHERE code='CHF'),  3, 1.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CHF'),  6, 1.25, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CHF'), 12, 1.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CHF'), 24, 1.75, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CHF'), 36, 2.00, 1, '2026-01-01', NOW()),
+
+  ((SELECT id FROM currencies WHERE code='GBP'),  3, 1.75, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='GBP'),  6, 2.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='GBP'), 12, 2.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='GBP'), 24, 3.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='GBP'), 36, 3.25, 1, '2026-01-01', NOW()),
+
+  ((SELECT id FROM currencies WHERE code='CAD'),  3, 1.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CAD'),  6, 1.75, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CAD'), 12, 2.25, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CAD'), 24, 2.75, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CAD'), 36, 3.00, 1, '2026-01-01', NOW()),
+
+  ((SELECT id FROM currencies WHERE code='AUD'),  3, 1.75, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='AUD'),  6, 2.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='AUD'), 12, 2.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='AUD'), 24, 3.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='AUD'), 36, 3.25, 1, '2026-01-01', NOW()),
+
+  ((SELECT id FROM currencies WHERE code='JPY'),  3, 0.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='JPY'),  6, 1.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='JPY'), 12, 1.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='JPY'), 24, 2.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='JPY'), 36, 2.50, 1, '2026-01-01', NOW());
+
+SELECT setval('savings_interest_rates_id_seq', (SELECT COALESCE(MAX(id), 1) FROM savings_interest_rates));
+
+-- Demo deposit-i za seedovane klijente:
+-- Stefan (client_id=1): 200,000 RSD na 12 meseci, autoRenew=true, otvoren 2 meseca pre, vec 2 isplate kamate
+--   linked_account: prvi aktivni RSD racun Stefana (account_number=222000112345678911)
+-- Milica (client_id=2): 1,000 EUR na 6 meseci, autoRenew=false, otvoren 1 mesec pre, 1 isplata kamate
+--   linked_account: prvi aktivni EUR racun Milice (account_number=222000121345678923)
+-- Koristimo subquery umesto hard-coded account.id jer accounts tabela nema eksplicitne ID-eve u seed-u.
+
+INSERT INTO savings_deposits (
+    client_id, linked_account_id, principal_amount, currency_id, term_months,
+    annual_interest_rate, start_date, maturity_date, next_interest_payment_date,
+    total_interest_paid, auto_renew, status, version, created_at, updated_at
+) VALUES
+  (1,
+   (SELECT id FROM accounts WHERE client_id=1 AND currency_id=(SELECT id FROM currencies WHERE code='RSD') AND status='ACTIVE' ORDER BY id LIMIT 1),
+   200000.0000, (SELECT id FROM currencies WHERE code='RSD'), 12,
+   4.00, '2026-03-12', '2027-03-12', '2026-06-12',
+   1333.3333, 1, 'ACTIVE', 0, NOW(), NOW()),
+  (2,
+   (SELECT id FROM accounts WHERE client_id=2 AND currency_id=(SELECT id FROM currencies WHERE code='EUR') AND status='ACTIVE' ORDER BY id LIMIT 1),
+   1000.0000, (SELECT id FROM currencies WHERE code='EUR'), 6,
+   2.00, '2026-04-12', '2026-10-12', '2026-06-12',
+   1.6667, 0, 'ACTIVE', 0, NOW(), NOW());
+
+SELECT setval('savings_deposits_id_seq', (SELECT COALESCE(MAX(id), 1) FROM savings_deposits));
+
+-- Istorija transakcija za demo deposit-e
+-- deposit_id=1 = Stefanov RSD deposit, deposit_id=2 = Milicin EUR deposit
+-- (Ovi ID-evi su sigurni jer su ovo prvi INSERT-i u savings_deposits tabelu)
+INSERT INTO savings_transactions (deposit_id, type, amount, currency_id, processed_date, description, created_at) VALUES
+  (1, 'OPEN', 200000.0000, (SELECT id FROM currencies WHERE code='RSD'),
+   '2026-03-12', 'Otvaranje depozita rok=12m stopa=4.00% p.a.', '2026-03-12 09:00:00'),
+  (1, 'INTEREST_PAYMENT', 666.6667, (SELECT id FROM currencies WHERE code='RSD'),
+   '2026-04-12', 'Mesecna kamata depozita #1', '2026-04-12 02:00:00'),
+  (1, 'INTEREST_PAYMENT', 666.6667, (SELECT id FROM currencies WHERE code='RSD'),
+   '2026-05-12', 'Mesecna kamata depozita #1', '2026-05-12 02:00:00'),
+  (2, 'OPEN', 1000.0000, (SELECT id FROM currencies WHERE code='EUR'),
+   '2026-04-12', 'Otvaranje depozita rok=6m stopa=2.00% p.a.', '2026-04-12 10:30:00'),
+  (2, 'INTEREST_PAYMENT', 1.6667, (SELECT id FROM currencies WHERE code='EUR'),
+   '2026-05-12', 'Mesecna kamata depozita #2', '2026-05-12 02:00:00');
+
+SELECT setval('savings_transactions_id_seq', (SELECT COALESCE(MAX(id), 1) FROM savings_transactions));
