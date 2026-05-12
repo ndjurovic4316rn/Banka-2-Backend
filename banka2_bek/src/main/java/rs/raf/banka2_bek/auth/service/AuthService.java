@@ -12,6 +12,7 @@ import rs.raf.banka2_bek.account.model.AccountType;
 import rs.raf.banka2_bek.account.repository.AccountRepository;
 import rs.raf.banka2_bek.account.util.AccountNumberUtils;
 import rs.raf.banka2_bek.auth.dto.*;
+import rs.raf.banka2_bek.auth.exception.AuthenticationFailedException;
 import rs.raf.banka2_bek.auth.model.PasswordResetRequestedEvent;
 import rs.raf.banka2_bek.auth.model.PasswordResetToken;
 import rs.raf.banka2_bek.auth.model.User;
@@ -181,8 +182,7 @@ public class AuthService {
 
     public AuthResponseDto login(LoginRequestDto request) {
         // Opciono.2 — proveri lockout pre nego sto se proveri lozinka.
-        // Bacaja AccountLockedException ako je email lock-ovan (vidi
-        // AuthService client error handling u GlobalExceptionHandler-u).
+        // Bacaja AccountLockedException ako je email lock-ovan; mapira se u 401.
         accountLockoutService.assertNotLocked(request.getEmail());
 
         // First, try to find an employee with this email
@@ -194,7 +194,9 @@ public class AuthService {
             String salt = employee.getSaltPassword();
             if (passwordEncoder.matches(request.getPassword() + salt, employee.getPassword())) {
                 if (!Boolean.TRUE.equals(employee.getActive())) {
-                    throw new RuntimeException("Employee account is not active");
+                    // Spec Sc 14 — login deaktiviranog naloga vraca 401, ne 400
+                    // (Bug T1-012 prijavljen 12.05.2026).
+                    throw new AuthenticationFailedException("Nalog je deaktiviran.");
                 }
 
                 accountLockoutService.recordSuccess(request.getEmail());
@@ -211,7 +213,9 @@ public class AuthService {
 
             if (passwordEncoder.matches(request.getPassword(), user.getPassword())) {
                 if (!user.isActive()) {
-                    throw new RuntimeException("User account is not active");
+                    // Isto kao employee — generic poruka ne otkriva da li email
+                    // postoji ili je deaktiviran. Vraca 401.
+                    throw new AuthenticationFailedException("Nalog je deaktiviran.");
                 }
 
                 accountLockoutService.recordSuccess(request.getEmail());
@@ -222,8 +226,13 @@ public class AuthService {
         }
 
         // Neither employee nor user found, or password didn't match — broji failure.
+        // Spec Sc 5: posle 4 neuspeha, 5. pokusaj zakljucava nalog. AccountLockoutService
+        // sad baca AccountLockedException u istom pozivu kad pretreknemo prag — tako
+        // korisnik dobija lockout poruku na 5. pokusaju (Bug T1-015), ne tek na 6.
         accountLockoutService.recordFailure(request.getEmail());
-        throw new RuntimeException("Invalid email or password");
+        // Spec Sc 2/3: 401 sa generic porukom "Neispravni unos" (poruka na SR jer
+        // ostatak UI je na SR — Bug T1-017 mesan SR/EN).
+        throw new AuthenticationFailedException("Neispravan email ili lozinka.");
     }
 
     public String requestPasswordReset(PasswordResetRequestDto request) {

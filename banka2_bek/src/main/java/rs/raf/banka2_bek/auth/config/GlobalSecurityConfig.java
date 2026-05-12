@@ -62,6 +62,7 @@ public class GlobalSecurityConfig  {
                                 "/auth/refresh",
                                 "/auth/logout",
                                 "/auth-employee/activate",
+                                "/auth-employee/activation-token/*/status",
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",

@@ -233,12 +233,19 @@ public class TaxService {
             // Za svaki listing: profit = sell - buy, konvertuj u RSD, akumuliraj.
             // NET dobit/gubitak se racuna preko svih listinga; porez je 0 ako je total <= 0.
             // P2.4 — biljezimo per-listing breakdown za prikaz/audit.
+            //
+            // Spec §517 + bug prijavljen 12.05.2026 (tim screenshot tax_record_breakdowns):
+            // pre fix-a, listings sa SAMO buy (bez sell) su davali profit = 0 - buy = -buy
+            // sto je laznja indikacija "gubitka" — porez se po spec-u racuna SAMO na
+            // REALIZOVANU dobit (kad je prodaja izvrsena). Skupljac SVIH bought listings
+            // u breakdown-u je davao haosno "sve negativno" stanje. Sad ukljucujemo
+            // samo listings sa sell > 0 (realizovani trgovni dogadjaj). Sva nepotrosenih
+            // pozicija ostaju u portfolio-u kao unrealized — bez tax efekta.
             BigDecimal totalProfit = BigDecimal.ZERO;
-            Set<Long> allListings = new HashSet<>(buyByListing.keySet());
-            allListings.addAll(sellByListing.keySet());
+            Set<Long> realizedListings = new HashSet<>(sellByListing.keySet());
             // Akumuliraj per-listing breakdown stavke pre nego sto saznamo TaxRecord ID-jeve
             java.util.List<PerListingProfit> perListingProfits = new java.util.ArrayList<>();
-            for (Long listingId : allListings) {
+            for (Long listingId : realizedListings) {
                 BigDecimal sell = sellByListing.getOrDefault(listingId, BigDecimal.ZERO);
                 BigDecimal buy = buyByListing.getOrDefault(listingId, BigDecimal.ZERO);
                 BigDecimal assetProfit = sell.subtract(buy);

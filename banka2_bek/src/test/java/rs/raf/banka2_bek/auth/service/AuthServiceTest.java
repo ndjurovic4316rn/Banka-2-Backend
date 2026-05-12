@@ -192,7 +192,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(new LoginRequestDto("missing@test.com", "bad")))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Invalid email or password");
+                .hasMessageContaining("Neispravan email ili lozinka");
     }
 
     // ===== Employee login with salt-based password hashing =====
@@ -223,7 +223,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(new LoginRequestDto(employee.getEmail(), "wrongPass")))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Invalid email or password");
+                .hasMessageContaining("Neispravan email ili lozinka");
     }
 
     // ===== Login with inactive account =====
@@ -253,7 +253,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(new LoginRequestDto("inactive-emp@test.com", "password")))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Employee account is not active");
+                .hasMessageContaining("Nalog je deaktiviran");
     }
 
     @Test
@@ -271,7 +271,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(new LoginRequestDto("inactive@test.com", "password")))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("User account is not active");
+                .hasMessageContaining("Nalog je deaktiviran");
     }
 
     // ===== Password reset token expiry validation =====
@@ -506,6 +506,6 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(new LoginRequestDto("null-active@test.com", "pass")))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Employee account is not active");
+                .hasMessageContaining("Nalog je deaktiviran");
     }
 }

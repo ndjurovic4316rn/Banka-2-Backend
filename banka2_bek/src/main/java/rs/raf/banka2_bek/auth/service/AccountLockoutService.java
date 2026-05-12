@@ -62,6 +62,9 @@ public class AccountLockoutService {
     /**
      * Baca {@link AccountLockedException} ako je email trenutno lock-ovan.
      * Treba pozvati pre nego sto se proveri lozinka.
+     *
+     * Poruka je na srpskom (Bug T1-017 — pre fix-a poruka je bila pomesana
+     * SR/EN sto je FE prosledjivao 1:1 korisniku).
      */
     public void assertNotLocked(String email) {
         if (email == null) return;
@@ -69,14 +72,19 @@ public class AccountLockoutService {
         Instant locked = lockedUntil.getIfPresent(key);
         if (locked != null && locked.isAfter(Instant.now())) {
             long secondsRemaining = locked.getEpochSecond() - Instant.now().getEpochSecond();
-            throw new AccountLockedException(
-                    "Account temporarily locked due to too many failed attempts; try again in "
-                    + (secondsRemaining / 60 + 1) + " min", secondsRemaining);
+            throw new AccountLockedException(formatLockoutMessage(secondsRemaining), secondsRemaining);
         }
     }
 
     /**
      * Belezi neuspesan pokusaj i lockuje racun ako je dosegnut prag.
+     *
+     * Spec Sc 5 (Bug T1-015): "posle 4 neuspeha, 5. pokusaj zakljucava nalog".
+     * Stari kod je samo postavljao lock na 5. pokusaju ali vracao genericku
+     * gresku "Invalid email or password" — korisnik je dobijao lockout alert
+     * tek na 6. pokusaju kad je {@code assertNotLocked} pucao. Sad bacamo
+     * {@link AccountLockedException} odmah kad pretreknemo prag, tako da
+     * korisnik vidi lockout poruku na samom 5. pokusaju.
      */
     public void recordFailure(String email) {
         if (email == null) return;
@@ -84,10 +92,19 @@ public class AccountLockoutService {
         AtomicInteger count = failedAttempts.get(key, k -> new AtomicInteger(0));
         int attempts = count.incrementAndGet();
         if (attempts >= maxFailedAttempts) {
-            lockedUntil.put(key, Instant.now().plus(Duration.ofMinutes(lockDurationMinutes)));
+            Instant lockUntil = Instant.now().plus(Duration.ofMinutes(lockDurationMinutes));
+            lockedUntil.put(key, lockUntil);
             failedAttempts.invalidate(key);
             log.warn("Account locked: {} ({} failed attempts)", key, attempts);
+            long secondsRemaining = lockUntil.getEpochSecond() - Instant.now().getEpochSecond();
+            throw new AccountLockedException(formatLockoutMessage(secondsRemaining), secondsRemaining);
         }
+    }
+
+    private String formatLockoutMessage(long secondsRemaining) {
+        long minutes = Math.max(1, secondsRemaining / 60 + 1);
+        return "Nalog je privremeno zakljucan zbog previse neuspesnih pokusaja. "
+                + "Pokusajte ponovo za " + minutes + " min.";
     }
 
     /**

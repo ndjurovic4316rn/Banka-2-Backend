@@ -2683,53 +2683,53 @@ SELECT setval('currencies_id_seq', (SELECT COALESCE(MAX(id), 1) FROM currencies)
 -- CAD: 1.5-3.0%, AUD: 1.75-3.25%, JPY: 0.5-2.5%
 
 INSERT INTO savings_interest_rates (currency_id, term_months, annual_rate, active, effective_from, created_at) VALUES
-  ((SELECT id FROM currencies WHERE code='RSD'),  3, 2.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='RSD'),  6, 3.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='RSD'), 12, 4.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='RSD'), 24, 4.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='RSD'), 36, 5.00, true, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='RSD'),  3, 2.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='RSD'),  6, 3.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='RSD'), 12, 4.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='RSD'), 24, 4.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='RSD'), 36, 5.00, 1, '2026-01-01', NOW()),
 
-  ((SELECT id FROM currencies WHERE code='EUR'),  3, 1.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='EUR'),  6, 2.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='EUR'), 12, 2.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='EUR'), 24, 3.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='EUR'), 36, 3.50, true, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='EUR'),  3, 1.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='EUR'),  6, 2.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='EUR'), 12, 2.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='EUR'), 24, 3.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='EUR'), 36, 3.50, 1, '2026-01-01', NOW()),
 
-  ((SELECT id FROM currencies WHERE code='USD'),  3, 2.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='USD'),  6, 2.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='USD'), 12, 3.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='USD'), 24, 3.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='USD'), 36, 4.00, true, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='USD'),  3, 2.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='USD'),  6, 2.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='USD'), 12, 3.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='USD'), 24, 3.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='USD'), 36, 4.00, 1, '2026-01-01', NOW()),
 
-  ((SELECT id FROM currencies WHERE code='CHF'),  3, 1.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='CHF'),  6, 1.25, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='CHF'), 12, 1.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='CHF'), 24, 1.75, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='CHF'), 36, 2.00, true, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CHF'),  3, 1.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CHF'),  6, 1.25, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CHF'), 12, 1.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CHF'), 24, 1.75, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CHF'), 36, 2.00, 1, '2026-01-01', NOW()),
 
-  ((SELECT id FROM currencies WHERE code='GBP'),  3, 1.75, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='GBP'),  6, 2.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='GBP'), 12, 2.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='GBP'), 24, 3.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='GBP'), 36, 3.25, true, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='GBP'),  3, 1.75, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='GBP'),  6, 2.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='GBP'), 12, 2.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='GBP'), 24, 3.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='GBP'), 36, 3.25, 1, '2026-01-01', NOW()),
 
-  ((SELECT id FROM currencies WHERE code='CAD'),  3, 1.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='CAD'),  6, 1.75, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='CAD'), 12, 2.25, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='CAD'), 24, 2.75, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='CAD'), 36, 3.00, true, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CAD'),  3, 1.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CAD'),  6, 1.75, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CAD'), 12, 2.25, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CAD'), 24, 2.75, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='CAD'), 36, 3.00, 1, '2026-01-01', NOW()),
 
-  ((SELECT id FROM currencies WHERE code='AUD'),  3, 1.75, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='AUD'),  6, 2.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='AUD'), 12, 2.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='AUD'), 24, 3.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='AUD'), 36, 3.25, true, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='AUD'),  3, 1.75, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='AUD'),  6, 2.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='AUD'), 12, 2.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='AUD'), 24, 3.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='AUD'), 36, 3.25, 1, '2026-01-01', NOW()),
 
-  ((SELECT id FROM currencies WHERE code='JPY'),  3, 0.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='JPY'),  6, 1.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='JPY'), 12, 1.50, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='JPY'), 24, 2.00, true, '2026-01-01', NOW()),
-  ((SELECT id FROM currencies WHERE code='JPY'), 36, 2.50, true, '2026-01-01', NOW());
+  ((SELECT id FROM currencies WHERE code='JPY'),  3, 0.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='JPY'),  6, 1.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='JPY'), 12, 1.50, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='JPY'), 24, 2.00, 1, '2026-01-01', NOW()),
+  ((SELECT id FROM currencies WHERE code='JPY'), 36, 2.50, 1, '2026-01-01', NOW());
 
 SELECT setval('savings_interest_rates_id_seq', (SELECT COALESCE(MAX(id), 1) FROM savings_interest_rates));
 
@@ -2749,12 +2749,12 @@ INSERT INTO savings_deposits (
    (SELECT id FROM accounts WHERE client_id=1 AND currency_id=(SELECT id FROM currencies WHERE code='RSD') AND status='ACTIVE' ORDER BY id LIMIT 1),
    200000.0000, (SELECT id FROM currencies WHERE code='RSD'), 12,
    4.00, '2026-03-12', '2027-03-12', '2026-06-12',
-   1333.3333, true, 'ACTIVE', 0, NOW(), NOW()),
+   1333.3333, 1, 'ACTIVE', 0, NOW(), NOW()),
   (2,
    (SELECT id FROM accounts WHERE client_id=2 AND currency_id=(SELECT id FROM currencies WHERE code='EUR') AND status='ACTIVE' ORDER BY id LIMIT 1),
    1000.0000, (SELECT id FROM currencies WHERE code='EUR'), 6,
    2.00, '2026-04-12', '2026-10-12', '2026-06-12',
-   1.6667, false, 'ACTIVE', 0, NOW(), NOW());
+   1.6667, 0, 'ACTIVE', 0, NOW(), NOW());
 
 SELECT setval('savings_deposits_id_seq', (SELECT COALESCE(MAX(id), 1) FROM savings_deposits));
 
