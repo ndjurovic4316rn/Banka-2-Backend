@@ -39,6 +39,7 @@ public final class InvestmentFundDtos {
         private BigDecimal liquidAmount;
         private BigDecimal profit;
         private BigDecimal minimumContribution;
+        private Long accountId;
         private String accountNumber;
         private List<FundHoldingDto> holdings;
         private List<FundPerformancePointDto> performance;

@@ -26,8 +26,18 @@ public class InvestmentFundController {
     public ResponseEntity<List<InvestmentFundSummaryDto>> list(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String sort,
-            @RequestParam(required = false) String direction) {
-        return ResponseEntity.ok(investmentFundService.listDiscovery(search, sort, direction));
+            @RequestParam(required = false) String direction,
+            @RequestParam(required = false) java.math.BigDecimal minContribution,
+            @RequestParam(required = false) java.math.BigDecimal maxContribution,
+            @RequestParam(required = false) java.math.BigDecimal minFundValue,
+            @RequestParam(required = false) java.math.BigDecimal maxFundValue,
+            @RequestParam(required = false) java.math.BigDecimal minProfit,
+            @RequestParam(required = false) java.math.BigDecimal maxProfit) {
+        return ResponseEntity.ok(investmentFundService.listDiscovery(
+                search, sort, direction,
+                minContribution, maxContribution,
+                minFundValue, maxFundValue,
+                minProfit, maxProfit));
     }
 
     @GetMapping("/{id}")

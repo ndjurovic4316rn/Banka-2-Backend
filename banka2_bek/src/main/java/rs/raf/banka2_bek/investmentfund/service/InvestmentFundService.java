@@ -155,6 +155,14 @@ public class InvestmentFundService {
     }
 
     public List<InvestmentFundSummaryDto> listDiscovery(String searchQuery, String sortField, String sortDirection) {
+        return listDiscovery(searchQuery, sortField, sortDirection,
+                null, null, null, null, null, null);
+    }
+
+    public List<InvestmentFundSummaryDto> listDiscovery(String searchQuery, String sortField, String sortDirection,
+                                                         BigDecimal minContribution, BigDecimal maxContribution,
+                                                         BigDecimal minFundValue, BigDecimal maxFundValue,
+                                                         BigDecimal minProfit, BigDecimal maxProfit) {
         List<InvestmentFund> funds = investmentFundRepository.findByActiveTrueOrderByNameAsc();
 
         Stream<InvestmentFund> stream = funds.stream();
@@ -163,6 +171,14 @@ public class InvestmentFundService {
             stream = stream.filter(f ->
                     (f.getName() != null && f.getName().toLowerCase().contains(q)) ||
                             (f.getDescription() != null && f.getDescription().toLowerCase().contains(q)));
+        }
+        if (minContribution != null) {
+            stream = stream.filter(f -> f.getMinimumContribution() != null
+                    && f.getMinimumContribution().compareTo(minContribution) >= 0);
+        }
+        if (maxContribution != null) {
+            stream = stream.filter(f -> f.getMinimumContribution() != null
+                    && f.getMinimumContribution().compareTo(maxContribution) <= 0);
         }
 
         List<InvestmentFundSummaryDto> result = stream.map(f -> {
@@ -173,6 +189,20 @@ public class InvestmentFundService {
                     .orElse("N/A");
             return InvestmentFundMapper.toSummaryDto(f, fundValue, profit, managerName);
         }).collect(Collectors.toCollection(ArrayList::new));
+
+        // Numericki filteri po izvedenim poljima primenjeni nakon mapiranja (DTO ima vrednosti).
+        if (minFundValue != null) {
+            result.removeIf(d -> d.getFundValue() == null || d.getFundValue().compareTo(minFundValue) < 0);
+        }
+        if (maxFundValue != null) {
+            result.removeIf(d -> d.getFundValue() == null || d.getFundValue().compareTo(maxFundValue) > 0);
+        }
+        if (minProfit != null) {
+            result.removeIf(d -> d.getProfit() == null || d.getProfit().compareTo(minProfit) < 0);
+        }
+        if (maxProfit != null) {
+            result.removeIf(d -> d.getProfit() == null || d.getProfit().compareTo(maxProfit) > 0);
+        }
 
         Comparator<InvestmentFundSummaryDto> comparator = buildComparator(sortField);
         if ("DESC".equalsIgnoreCase(sortDirection)) {

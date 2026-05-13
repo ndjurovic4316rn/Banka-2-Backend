@@ -2563,6 +2563,93 @@ WHERE f.name = 'Banka 2 Tech Growth'
         AND p.user_role = 'CLIENT'
   );
 
+-- 5) Hartije fondova (FUND portfolio entries) — Celina 4 spec:
+--    "Svaki fond ima svoje investicije (hartije od vrednosti) i likvidnost".
+--    InvestmentFundService.getFundDetails cita portfolios.findByUserIdAndUserRole(fund.id, 'FUND')
+--    da bi vratio holdings tabelu na FE Detaljnom prikazu fonda.
+
+-- "Banka 2 Stable Income" — konzervativan: blue-chip akcije
+INSERT INTO portfolios (user_id, user_role, listing_id, listing_ticker, listing_name, listing_type, quantity, average_buy_price, public_quantity, last_modified)
+SELECT f.id, 'FUND', l.id, l.ticker, l.name, 'STOCK', 100, 180.5000, 0, NOW()
+FROM investment_funds f, listings l
+WHERE f.name = 'Banka 2 Stable Income' AND l.ticker = 'AAPL'
+AND NOT EXISTS (SELECT 1 FROM portfolios p WHERE p.user_id = f.id AND p.user_role = 'FUND' AND p.listing_id = l.id);
+
+INSERT INTO portfolios (user_id, user_role, listing_id, listing_ticker, listing_name, listing_type, quantity, average_buy_price, public_quantity, last_modified)
+SELECT f.id, 'FUND', l.id, l.ticker, l.name, 'STOCK', 50, 370.0000, 0, NOW()
+FROM investment_funds f, listings l
+WHERE f.name = 'Banka 2 Stable Income' AND l.ticker = 'MSFT'
+AND NOT EXISTS (SELECT 1 FROM portfolios p WHERE p.user_id = f.id AND p.user_role = 'FUND' AND p.listing_id = l.id);
+
+INSERT INTO portfolios (user_id, user_role, listing_id, listing_ticker, listing_name, listing_type, quantity, average_buy_price, public_quantity, last_modified)
+SELECT f.id, 'FUND', l.id, l.ticker, l.name, 'STOCK', 40, 155.0000, 0, NOW()
+FROM investment_funds f, listings l
+WHERE f.name = 'Banka 2 Stable Income' AND l.ticker = 'GOOG'
+AND NOT EXISTS (SELECT 1 FROM portfolios p WHERE p.user_id = f.id AND p.user_role = 'FUND' AND p.listing_id = l.id);
+
+-- "Banka 2 Tech Growth" — agresivan: tech-heavy
+INSERT INTO portfolios (user_id, user_role, listing_id, listing_ticker, listing_name, listing_type, quantity, average_buy_price, public_quantity, last_modified)
+SELECT f.id, 'FUND', l.id, l.ticker, l.name, 'STOCK', 200, 185.0000, 0, NOW()
+FROM investment_funds f, listings l
+WHERE f.name = 'Banka 2 Tech Growth' AND l.ticker = 'AAPL'
+AND NOT EXISTS (SELECT 1 FROM portfolios p WHERE p.user_id = f.id AND p.user_role = 'FUND' AND p.listing_id = l.id);
+
+INSERT INTO portfolios (user_id, user_role, listing_id, listing_ticker, listing_name, listing_type, quantity, average_buy_price, public_quantity, last_modified)
+SELECT f.id, 'FUND', l.id, l.ticker, l.name, 'STOCK', 50, 450.0000, 0, NOW()
+FROM investment_funds f, listings l
+WHERE f.name = 'Banka 2 Tech Growth' AND l.ticker = 'NVDA'
+AND NOT EXISTS (SELECT 1 FROM portfolios p WHERE p.user_id = f.id AND p.user_role = 'FUND' AND p.listing_id = l.id);
+
+INSERT INTO portfolios (user_id, user_role, listing_id, listing_ticker, listing_name, listing_type, quantity, average_buy_price, public_quantity, last_modified)
+SELECT f.id, 'FUND', l.id, l.ticker, l.name, 'STOCK', 25, 310.0000, 0, NOW()
+FROM investment_funds f, listings l
+WHERE f.name = 'Banka 2 Tech Growth' AND l.ticker = 'META'
+AND NOT EXISTS (SELECT 1 FROM portfolios p WHERE p.user_id = f.id AND p.user_role = 'FUND' AND p.listing_id = l.id);
+
+INSERT INTO portfolios (user_id, user_role, listing_id, listing_ticker, listing_name, listing_type, quantity, average_buy_price, public_quantity, last_modified)
+SELECT f.id, 'FUND', l.id, l.ticker, l.name, 'STOCK', 40, 200.0000, 0, NOW()
+FROM investment_funds f, listings l
+WHERE f.name = 'Banka 2 Tech Growth' AND l.ticker = 'TSLA'
+AND NOT EXISTS (SELECT 1 FROM portfolios p WHERE p.user_id = f.id AND p.user_role = 'FUND' AND p.listing_id = l.id);
+
+-- 6) Istorijski snapshot-i vrednosti fondova — Celina 4 spec:
+--    "Performanse fonda: tabela ili grafikon (mesecni/kvartalni/godisnji prikaz)"
+--    "treba da pratite performanse fonda -> belezite istorijske podatke"
+--
+--    FundValueSnapshotScheduler pravi dnevne snapshot-e u 23:45, ali za novi
+--    stack istorija je prazna pa graf "Performanse fonda" pokazuje 1 tacku.
+--    Ovde backfill-ujemo dnevne snapshot-e od inception_date do juce sa
+--    realisticnim fluktuacijama oko trenutne vrednosti (sine wave + random).
+--    "Banka 2 Stable Income" (konzervativan): range ~490M-510M, fluktuacija ~0.5%
+--    "Banka 2 Tech Growth" (agresivan): range ~470M-530M, fluktuacija ~2%
+INSERT INTO fund_value_snapshots (fund_id, snapshot_date, fund_value, liquid_amount, invested_total, profit)
+SELECT f.id, gs::date,
+       (500000000 + 10000000 * sin((gs::date - f.inception_date)::float / 14)
+                  + 2500000 * (random() - 0.5))::decimal(19,4),
+       (500000000 + 10000000 * sin((gs::date - f.inception_date)::float / 14)
+                  + 2500000 * (random() - 0.5))::decimal(19,4),
+       250000.0000,
+       (500000000 + 10000000 * sin((gs::date - f.inception_date)::float / 14)
+                  + 2500000 * (random() - 0.5) - 250000)::decimal(19,4)
+FROM investment_funds f,
+     LATERAL generate_series(f.inception_date, CURRENT_DATE - INTERVAL '1 day', '1 day'::interval) AS gs
+WHERE f.name = 'Banka 2 Stable Income'
+  AND NOT EXISTS (SELECT 1 FROM fund_value_snapshots s WHERE s.fund_id = f.id AND s.snapshot_date = gs::date);
+
+INSERT INTO fund_value_snapshots (fund_id, snapshot_date, fund_value, liquid_amount, invested_total, profit)
+SELECT f.id, gs::date,
+       (500000000 + 25000000 * sin((gs::date - f.inception_date)::float / 10)
+                  + 10000000 * (random() - 0.5))::decimal(19,4),
+       (500000000 + 25000000 * sin((gs::date - f.inception_date)::float / 10)
+                  + 10000000 * (random() - 0.5))::decimal(19,4),
+       500000.0000,
+       (500000000 + 25000000 * sin((gs::date - f.inception_date)::float / 10)
+                  + 10000000 * (random() - 0.5) - 500000)::decimal(19,4)
+FROM investment_funds f,
+     LATERAL generate_series(f.inception_date, CURRENT_DATE - INTERVAL '1 day', '1 day'::interval) AS gs
+WHERE f.name = 'Banka 2 Tech Growth'
+  AND NOT EXISTS (SELECT 1 FROM fund_value_snapshots s WHERE s.fund_id = f.id AND s.snapshot_date = gs::date);
+
 -- ============================================================
 -- INTER-BANK HANDSHAKE TEST SEED (Celina 5 — Tim 1 / Tim 2 razmena)
 -- ============================================================

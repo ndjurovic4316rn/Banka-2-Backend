@@ -127,8 +127,13 @@ public class OrderServiceImpl implements OrderService {
         }
         Portfolio portfolio = null;
         if (direction == OrderDirection.SELL) {
+            // Fund SELL: hartija je u portfoliju sa user_role=FUND i user_id=fund.id,
+            // ne pod trenutnim supervizorom. Bez ovog branch-a BE bi rekao
+            // "Nemate ovu hartiju u portfoliju" iako fond stvarno ima hartiju.
+            Long lookupUserId = fund != null ? fund.getId() : userContext.userId();
+            String lookupUserRole = fund != null ? UserRole.FUND : userContext.userRole();
             portfolio = portfolioRepository
-                    .findByUserIdAndUserRoleAndListingIdForUpdate(userContext.userId(), userContext.userRole(), listing.getId())
+                    .findByUserIdAndUserRoleAndListingIdForUpdate(lookupUserId, lookupUserRole, listing.getId())
                     .orElseThrow(() -> new InsufficientHoldingsException(
                             "Nemate ovu hartiju u portfoliju"));
             int available = portfolio.getAvailableQuantity();
