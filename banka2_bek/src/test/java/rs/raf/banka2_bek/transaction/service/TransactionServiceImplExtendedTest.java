@@ -130,4 +130,60 @@ class TransactionServiceImplExtendedTest {
         when(transactionRepository.findReceiptTransactionForClient(99L, 5L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.getReceiptTransaction(99L, 5L)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void recordCrossCurrencyPaymentSettlement_creates6TransactionsWithCorrectDebitsAndCredits() {
+        Currency eur = mock(Currency.class);
+        when(eur.getCode()).thenReturn("EUR");
+        Currency usd = mock(Currency.class);
+        when(usd.getCode()).thenReturn("USD");
+
+        Account fromAccount = Account.builder()
+                .id(1L).accountNumber("111111111111111111").currency(eur)
+                .balance(new BigDecimal("4900")).availableBalance(new BigDecimal("4900"))
+                .build();
+        Account toAccount = Account.builder()
+                .id(2L).accountNumber("222222222222222222").currency(usd)
+                .balance(new BigDecimal("608")).availableBalance(new BigDecimal("608"))
+                .build();
+        Account bankFromAccount = Account.builder()
+                .id(10L).accountNumber("BANK-EUR").currency(eur)
+                .balance(new BigDecimal("1000100")).availableBalance(new BigDecimal("1000100"))
+                .build();
+        Account bankToAccount = Account.builder()
+                .id(11L).accountNumber("BANK-USD").currency(usd)
+                .balance(new BigDecimal("998920")).availableBalance(new BigDecimal("998920"))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id(55L).fromAccount(fromAccount).toAccountNumber("222222222222222222")
+                .amount(new BigDecimal("100.00")).purpose("FX test")
+                .build();
+
+        BigDecimal totalFromClient = new BigDecimal("100.50");
+        BigDecimal creditedAmount = new BigDecimal("108.00");
+
+        when(transactionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        List<TransactionResponseDto> results = service.recordCrossCurrencyPaymentSettlement(
+                payment, toAccount, bankFromAccount, bankToAccount,
+                mock(Client.class), totalFromClient, creditedAmount);
+
+        assertThat(results).hasSize(6);
+        // step1 debit: client pays totalFromClient
+        assertThat(results.get(0).getDebit()).isEqualByComparingTo("100.50");
+        assertThat(results.get(0).getCredit()).isEqualByComparingTo("0");
+        // step1 credit: bank receives totalFromClient
+        assertThat(results.get(1).getCredit()).isEqualByComparingTo("100.50");
+        assertThat(results.get(1).getDebit()).isEqualByComparingTo("0");
+        // step2 debit: bank pays original amount for FX swap
+        assertThat(results.get(2).getDebit()).isEqualByComparingTo("100.00");
+        // step2 credit: bank receives converted amount
+        assertThat(results.get(3).getCredit()).isEqualByComparingTo("108.00");
+        // step3 debit: bank pays converted amount to recipient
+        assertThat(results.get(4).getDebit()).isEqualByComparingTo("108.00");
+        // step3 credit: recipient receives converted amount
+        assertThat(results.get(5).getCredit()).isEqualByComparingTo("108.00");
+        assertThat(results.get(5).getDebit()).isEqualByComparingTo("0");
+    }
 }

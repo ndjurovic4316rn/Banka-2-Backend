@@ -23,6 +23,7 @@ import rs.raf.banka2_bek.payment.dto.CreatePaymentRequestDto;
 import rs.raf.banka2_bek.payment.dto.PaymentResponseDto;
 import rs.raf.banka2_bek.payment.model.PaymentCode;
 import rs.raf.banka2_bek.payment.model.Payment;
+import rs.raf.banka2_bek.payment.model.PaymentStatus;
 import rs.raf.banka2_bek.payment.repository.PaymentAccountRepository;
 import rs.raf.banka2_bek.payment.repository.PaymentRepository;
 import rs.raf.banka2_bek.payment.service.implementation.PaymentServiceImpl;
@@ -503,6 +504,228 @@ class PaymentServiceImplTest {
 //                .hasMessageContaining("Authenticated client does not exist");
 //    }
 
+
+    // ========== validatePayment ==========
+
+    @Test
+    void validatePayment_throwsWhenRequestNull() {
+        assertThatThrownBy(() -> paymentService.validatePayment(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Podaci o placanju nedostaju");
+    }
+
+    @Test
+    void validatePayment_throwsWhenFromAccountBlank() {
+        request.setFromAccount("");
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Racun posiljaoca nedostaje");
+    }
+
+    @Test
+    void validatePayment_throwsWhenToAccountNull() {
+        request.setToAccount(null);
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Racun primaoca nedostaje");
+    }
+
+    @Test
+    void validatePayment_throwsWhenAmountZero() {
+        request.setAmount(BigDecimal.ZERO);
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Iznos mora biti veci od 0");
+    }
+
+    @Test
+    void validatePayment_throwsWhenFromAccountNotFound() {
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Racun posiljaoca ne postoji");
+    }
+
+    @Test
+    void validatePayment_throwsWhenToAccountNotFound() {
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(accountRepository.findByAccountNumber(request.getToAccount())).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Racun primaoca ne postoji");
+    }
+
+    @Test
+    void validatePayment_throwsWhenFromAccountInactive() {
+        fromAccount.setStatus(AccountStatus.INACTIVE);
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(accountRepository.findByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Racun posiljaoca nije aktivan");
+    }
+
+    @Test
+    void validatePayment_throwsWhenToAccountInactive() {
+        toAccount.setStatus(AccountStatus.INACTIVE);
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(accountRepository.findByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Racun primaoca nije aktivan");
+    }
+
+    @Test
+    void validatePayment_throwsWhenSameAccount() {
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(accountRepository.findByAccountNumber(request.getToAccount())).thenReturn(Optional.of(fromAccount));
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Racuni moraju biti razliciti");
+    }
+
+    @Test
+    void validatePayment_throwsWhenFromAccountNotOwnedByClient() {
+        Client other = new Client();
+        other.setId(777L);
+        fromAccount.setClient(other);
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(accountRepository.findByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Racun ne pripada klijentu");
+    }
+
+    @Test
+    void validatePayment_throwsWhenInsufficientFunds() {
+        fromAccount.setAvailableBalance(new BigDecimal("5.00"));
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(accountRepository.findByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Nedovoljno sredstava");
+    }
+
+    @Test
+    void validatePayment_throwsWhenDailyLimitExceeded() {
+        fromAccount.setDailyLimit(new BigDecimal("50.00"));
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(accountRepository.findByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Prekoracen dnevni limit");
+    }
+
+    @Test
+    void validatePayment_throwsWhenMonthlyLimitExceeded() {
+        fromAccount.setMonthlyLimit(new BigDecimal("70.00"));
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(accountRepository.findByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
+        assertThatThrownBy(() -> paymentService.validatePayment(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Prekoracen mesecni limit");
+    }
+
+    @Test
+    void validatePayment_succeedsForValidRequest() {
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(accountRepository.findByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
+        paymentService.validatePayment(request); // no exception
+    }
+
+    // ========== recordAbortedPayment ==========
+
+    @Test
+    void recordAbortedPayment_returnsNullForNullRequest() {
+        assertThat(paymentService.recordAbortedPayment(null, "otp")).isNull();
+    }
+
+    @Test
+    void recordAbortedPayment_returnsNullWhenFromAccountNull() {
+        request.setFromAccount(null);
+        assertThat(paymentService.recordAbortedPayment(request, "otp")).isNull();
+    }
+
+    @Test
+    void recordAbortedPayment_returnsNullWhenAmountNull() {
+        request.setAmount(null);
+        assertThat(paymentService.recordAbortedPayment(request, "otp")).isNull();
+    }
+
+    @Test
+    void recordAbortedPayment_returnsNullWhenFromAccountNotFound() {
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.empty());
+        assertThat(paymentService.recordAbortedPayment(request, "otp")).isNull();
+    }
+
+    @Test
+    void recordAbortedPayment_returnsNullWhenNotAuthenticated() {
+        SecurityContextHolder.clearContext();
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        assertThat(paymentService.recordAbortedPayment(request, "otp")).isNull();
+    }
+
+    @Test
+    void recordAbortedPayment_returnsNullWhenWrongClient() {
+        Client other = new Client();
+        other.setId(999L);
+        fromAccount.setClient(other);
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        assertThat(paymentService.recordAbortedPayment(request, "otp")).isNull();
+    }
+
+    @Test
+    void recordAbortedPayment_savesAbortedPaymentWithExplicitReason() {
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(inv -> {
+            Payment p = inv.getArgument(0);
+            p.setId(77L);
+            return p;
+        });
+
+        Long id = paymentService.recordAbortedPayment(request, "OTP max retries exceeded");
+
+        assertThat(id).isEqualTo(77L);
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(PaymentStatus.ABORTED);
+        assertThat(captor.getValue().getPurpose()).isEqualTo("OTP max retries exceeded");
+    }
+
+    @Test
+    void recordAbortedPayment_usesDefaultPurposeWhenReasonNull() {
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(inv -> {
+            Payment p = inv.getArgument(0);
+            p.setId(78L);
+            return p;
+        });
+
+        Long id = paymentService.recordAbortedPayment(request, null);
+
+        assertThat(id).isEqualTo(78L);
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getPurpose()).isEqualTo("OTP otkazano");
+    }
+
+    @Test
+    void recordAbortedPayment_setsNullPaymentCodeWhenMissing() {
+        request.setPaymentCode(null);
+        when(accountRepository.findByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(inv -> {
+            Payment p = inv.getArgument(0);
+            p.setId(79L);
+            return p;
+        });
+
+        Long id = paymentService.recordAbortedPayment(request, "expired");
+
+        assertThat(id).isEqualTo(79L);
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getPaymentCode()).isNull();
+    }
 
     private void authenticateAs(String email) {
         org.springframework.security.core.userdetails.User principal =
