@@ -32,6 +32,10 @@ import rs.raf.banka2_bek.payment.repository.PaymentAccountRepository;
 import rs.raf.banka2_bek.payment.repository.PaymentRepository;
 import rs.raf.banka2_bek.payment.service.implementation.PaymentServiceImpl;
 import rs.raf.banka2_bek.notification.service.MailNotificationService;
+import rs.raf.banka2_bek.interbank.service.BankRoutingService;
+import rs.raf.banka2_bek.interbank.service.TransactionExecutorService;
+import rs.raf.banka2_bek.interbank.service.InterbankPaymentAsyncService;
+import rs.raf.banka2_bek.interbank.repository.InterbankTransactionRepository;
 import rs.raf.banka2_bek.transaction.service.TransactionService;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -63,6 +67,10 @@ class PaymentServiceImplExtendedTest {
     @Mock private PaymentReceiptPdfGenerator paymentReceiptPdfGenerator;
     @Mock private ExchangeService exchangeService;
     @Mock private MailNotificationService mailNotificationService;
+    @Mock private BankRoutingService bankRoutingService;
+    @Mock private TransactionExecutorService transactionExecutorService;
+    @Mock private InterbankPaymentAsyncService interbankPaymentAsyncService;
+    @Mock private InterbankTransactionRepository interbankTransactionRepository;
 
     private PaymentServiceImpl paymentService;
 
@@ -77,7 +85,12 @@ class PaymentServiceImplExtendedTest {
         paymentService = new PaymentServiceImpl(
                 paymentRepository, paymentAccountRepository, accountRepository,
                 clientRepository, transactionService, paymentReceiptPdfGenerator,
-                exchangeService, mailNotificationService, "22200022");
+                exchangeService, mailNotificationService,
+                bankRoutingService, transactionExecutorService,
+                interbankPaymentAsyncService, interbankTransactionRepository,
+                "22200022");
+
+        lenient().when(bankRoutingService.isLocalAccount(any())).thenReturn(true);
 
         client = new Client();
         client.setId(10L);
@@ -656,7 +669,6 @@ class PaymentServiceImplExtendedTest {
             fromAccount.setStatus(AccountStatus.BLOCKED);
             CreatePaymentRequestDto request = buildRequest("100.00");
             when(paymentAccountRepository.findForUpdateByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
-            when(paymentAccountRepository.findForUpdateByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
 
             assertThatThrownBy(() -> paymentService.createPayment(request))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -695,7 +707,6 @@ class PaymentServiceImplExtendedTest {
             fromAccount.setClient(null);
             CreatePaymentRequestDto request = buildRequest("100.00");
             when(paymentAccountRepository.findForUpdateByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
-            when(paymentAccountRepository.findForUpdateByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
 
             assertThatThrownBy(() -> paymentService.createPayment(request))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -710,7 +721,6 @@ class PaymentServiceImplExtendedTest {
             fromAccount.setClient(other);
             CreatePaymentRequestDto request = buildRequest("100.00");
             when(paymentAccountRepository.findForUpdateByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
-            when(paymentAccountRepository.findForUpdateByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
 
             assertThatThrownBy(() -> paymentService.createPayment(request))
                     .isInstanceOf(IllegalArgumentException.class)

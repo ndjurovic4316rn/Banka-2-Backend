@@ -211,7 +211,7 @@ class PaymentControllerIntegrationTest {
                 .thenReturn(new CalculateExchangeResponseDto(108.0, 1.08, "EUR", "USD"));
 
         String fromNumber = "333333333333333333";
-        String toNumber = "444444444444444444";
+        String toNumber = "222444444444444444";
 
         createAccount(fromNumber, sender, employee, eur, new BigDecimal("1000.00"));
         createAccount(toNumber, receiver, employee, usd, new BigDecimal("500.00"));
@@ -399,9 +399,9 @@ class PaymentControllerIntegrationTest {
         Currency eur = ensureCurrency("EUR", "Euro", "E", "EU");
 
         String senderFrom = "101010101010101010";
-        String senderTo = "202020202020202020";
+        String senderTo = "222020202020202020";
         String outsiderFrom = "303030303030303030";
-        String outsiderTo = "404040404040404040";
+        String outsiderTo = "222040404040404040";
 
         createAccount(senderFrom, sender, employee, eur, new BigDecimal("2000.00"));
         createAccount(senderTo, receiver, employee, eur, new BigDecimal("500.00"));
@@ -445,7 +445,7 @@ class PaymentControllerIntegrationTest {
         Currency eur = ensureCurrency("EUR", "Euro", "E", "EU");
 
         String fromAccount = "505050505050505050";
-        String toAccount = "606060606060606060";
+        String toAccount = "222060606060606060";
 
         createAccount(fromAccount, sender, employee, eur, new BigDecimal("3000.00"));
         createAccount(toAccount, receiver, employee, eur, new BigDecimal("100.00"));
@@ -503,7 +503,7 @@ class PaymentControllerIntegrationTest {
         Currency eur = ensureCurrency("EUR", "Euro", "E", "EU");
 
         String fromAccount = "717171717171717171";
-        String toAccount = "818181818181818181";
+        String toAccount = "222818181818181818";
 
         createAccount(fromAccount, sender, employee, eur, new BigDecimal("1000.00"));
         createAccount(toAccount, receiver, employee, eur, new BigDecimal("500.00"));
@@ -548,7 +548,7 @@ class PaymentControllerIntegrationTest {
         Currency eur = ensureCurrency("EUR", "Euro", "E", "EU");
 
         String fromAccount = "919191919191919192";
-        String toAccount = "929292929292929292";
+        String toAccount = "222929292929292929";
 
         createAccount(fromAccount, sender, employee, eur, new BigDecimal("1000.00"));
         createAccount(toAccount, receiver, employee, eur, new BigDecimal("500.00"));

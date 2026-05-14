@@ -24,4 +24,5 @@ public class PaymentResponseDto {
     PaymentDirection direction;
     PaymentStatus status;
     LocalDateTime createdAt;
+    String sagaPhase;
 }

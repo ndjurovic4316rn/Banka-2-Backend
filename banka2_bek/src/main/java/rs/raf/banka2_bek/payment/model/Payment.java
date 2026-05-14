@@ -63,6 +63,12 @@ public class Payment {
     @Builder.Default
     private PaymentStatus status = PaymentStatus.PROCESSING;
 
+    @Column(name = "interbank_tx_id_string", length = 64)
+    private String interbankTxIdString;
+
+    @Column(name = "interbank_tx_routing_number")
+    private Integer interbankTxRoutingNumber;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_id", nullable = false)
     private Client createdBy;

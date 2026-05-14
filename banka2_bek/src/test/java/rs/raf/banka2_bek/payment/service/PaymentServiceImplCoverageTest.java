@@ -22,6 +22,10 @@ import rs.raf.banka2_bek.client.repository.ClientRepository;
 import rs.raf.banka2_bek.currency.model.Currency;
 import rs.raf.banka2_bek.exchange.ExchangeService;
 import rs.raf.banka2_bek.notification.service.MailNotificationService;
+import rs.raf.banka2_bek.interbank.service.BankRoutingService;
+import rs.raf.banka2_bek.interbank.service.TransactionExecutorService;
+import rs.raf.banka2_bek.interbank.service.InterbankPaymentAsyncService;
+import rs.raf.banka2_bek.interbank.repository.InterbankTransactionRepository;
 import rs.raf.banka2_bek.payment.dto.CreatePaymentRequestDto;
 import rs.raf.banka2_bek.payment.dto.PaymentResponseDto;
 import rs.raf.banka2_bek.payment.model.Payment;
@@ -38,6 +42,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -58,6 +63,10 @@ class PaymentServiceImplCoverageTest {
     @Mock private PaymentReceiptPdfGenerator paymentReceiptPdfGenerator;
     @Mock private ExchangeService exchangeService;
     @Mock private MailNotificationService mailNotificationService;
+    @Mock private BankRoutingService bankRoutingService;
+    @Mock private TransactionExecutorService transactionExecutorService;
+    @Mock private InterbankPaymentAsyncService interbankPaymentAsyncService;
+    @Mock private InterbankTransactionRepository interbankTransactionRepository;
 
     private PaymentServiceImpl paymentService;
 
@@ -66,7 +75,11 @@ class PaymentServiceImplCoverageTest {
         paymentService = new PaymentServiceImpl(
                 paymentRepository, paymentAccountRepository, accountRepository,
                 clientRepository, transactionService, paymentReceiptPdfGenerator,
-                exchangeService, mailNotificationService, "22200022");
+                exchangeService, mailNotificationService,
+                bankRoutingService, transactionExecutorService,
+                interbankPaymentAsyncService, interbankTransactionRepository,
+                "22200022");
+        lenient().when(bankRoutingService.isLocalAccount(any())).thenReturn(true);
     }
 
     @AfterEach
