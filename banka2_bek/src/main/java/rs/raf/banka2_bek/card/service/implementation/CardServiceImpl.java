@@ -40,16 +40,36 @@ public class CardServiceImpl implements CardService {
     @Override
     @Transactional
     public CardResponseDto createCard(CreateCardRequestDto request) {
-        Client client = getAuthenticatedClient();
-        Account account = accountRepository.findById(request.getAccountId())
-                .orElseThrow(() -> new RuntimeException("Racun nije pronadjen"));
-
-        if (account.getClient() == null || !account.getClient().getId().equals(client.getId())) {
-            throw new RuntimeException("Nemate pristup ovom racunu");
+        // SC28/T2-007 fix (14.05.2026): kad zaposleni pravi karticu u ime klijenta,
+        // JWT principal je email zaposlenog (NIJE klijent), pa getAuthenticatedClient()
+        // ne nadje klijenta i puca "Klijent nije pronadjen". Resenje: za EMPLOYEE/ADMIN
+        // role resolve klijenta preko account.getClient(); za CLIENT zadrzi ownership check.
+        boolean callerIsEmployee = isCallerEmployeeOrAdmin();
+        Client client;
+        if (callerIsEmployee) {
+            // Auth check (employee mora biti autentifikovan da bismo dosli ovde).
+            requireAuthenticated();
+        } else {
+            client = getAuthenticatedClient();
+            Account account = accountRepository.findById(request.getAccountId())
+                    .orElseThrow(() -> new RuntimeException("Racun nije pronadjen"));
+            if (account.getClient() == null || !account.getClient().getId().equals(client.getId())) {
+                throw new RuntimeException("Nemate pristup ovom racunu");
+            }
+            checkCardLimit(account, client);
+            BigDecimal limit = request.getCardLimit() != null ? request.getCardLimit() : BigDecimal.valueOf(100000);
+            CardType cardType = request.getCardType() != null ? request.getCardType() : CardType.VISA;
+            return toResponse(createAndSaveCard(account, client, limit, cardType));
         }
 
+        // Employee/Admin path: lookup account, resolve client from account
+        Account account = accountRepository.findById(request.getAccountId())
+                .orElseThrow(() -> new RuntimeException("Racun nije pronadjen"));
+        client = account.getClient();
+        if (client == null) {
+            throw new RuntimeException("Racun nema vlasnika (klijenta)");
+        }
         checkCardLimit(account, client);
-
         BigDecimal limit = request.getCardLimit() != null ? request.getCardLimit() : BigDecimal.valueOf(100000);
         CardType cardType = request.getCardType() != null ? request.getCardType() : CardType.VISA;
         return toResponse(createAndSaveCard(account, client, limit, cardType));
@@ -318,5 +338,23 @@ public class CardServiceImpl implements CardService {
             email = principal.toString();
         }
         return clientRepository.findByEmail(email).orElse(null);
+    }
+
+    private void requireAuthenticated() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getPrincipal() == null) {
+            throw new RuntimeException("Klijent nije pronadjen");
+        }
+    }
+
+    private boolean isCallerEmployeeOrAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) return false;
+        return auth.getAuthorities().stream().anyMatch(a -> {
+            String role = a.getAuthority();
+            return "ROLE_ADMIN".equals(role) || "ROLE_EMPLOYEE".equals(role)
+                    || "ADMIN".equals(role) || "EMPLOYEE".equals(role)
+                    || "SUPERVISOR".equals(role);
+        });
     }
 }

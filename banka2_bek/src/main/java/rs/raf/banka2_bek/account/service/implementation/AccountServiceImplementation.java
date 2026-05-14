@@ -138,6 +138,16 @@ public class AccountServiceImplementation implements AccountService {
             String actCode = request.getCompany() != null ? request.getCompany().getActivityCode() : request.getActivityCode();
             String addr = request.getCompany() != null ? request.getCompany().getAddress() : request.getFirmAddress();
 
+            // T2-008: pre nego sto pokusamo INSERT, eksplicitno proveri uniqueness
+            // (PIB i maticni broj). Bez ove provere, korisnik dobija ruzni
+            // ConstraintViolationException raw SQL message.
+            if (taxNum != null && !taxNum.isBlank() && companyRepository.existsByTaxNumber(taxNum)) {
+                throw new IllegalArgumentException("Firma sa PIB-om '" + taxNum + "' vec postoji u sistemu.");
+            }
+            if (regNum != null && !regNum.isBlank() && companyRepository.existsByRegistrationNumber(regNum)) {
+                throw new IllegalArgumentException("Firma sa maticnim brojem '" + regNum + "' vec postoji u sistemu.");
+            }
+
             company = Company.builder()
                     .name(compName)
                     .registrationNumber(regNum)
@@ -155,7 +165,14 @@ public class AccountServiceImplementation implements AccountService {
                 company.getAuthorizedPersons().add(ap);
             }
 
-            company = companyRepository.save(company);
+            try {
+                company = companyRepository.save(company);
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                // Defense-in-depth: ako race condition (dva paralelna createAccount sa istim PIB-om)
+                // probije unique constraint, vrati user-friendly poruku umesto raw SQL exception.
+                throw new IllegalArgumentException(
+                        "Firma sa unetim PIB-om ili maticnim brojem vec postoji u sistemu.");
+            }
         }
 
         if (!isBusiness && client == null) {
