@@ -59,4 +59,21 @@ public class ClientController {
             @Valid @RequestBody UpdateClientRequestDto request) {
         return ResponseEntity.ok(clientService.updateClient(id, request));
     }
+
+    /**
+     * T4A-017: supervizor menja TRADE_STOCKS permisiju za klijenta.
+     * Spec C3 §6 / C4 §31: samo klijenti sa permisijom mogu da trgovuju hartijama.
+     */
+    @Operation(summary = "Set client trading permission", description = "Supervizor/admin menja canTradeStocks flag")
+    @PatchMapping("/{id}/trading")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    public ResponseEntity<ClientResponseDto> setTradingPermission(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, Boolean> body) {
+        Boolean canTrade = body.get("canTradeStocks");
+        if (canTrade == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(clientService.setTradingPermission(id, canTrade));
+    }
 }

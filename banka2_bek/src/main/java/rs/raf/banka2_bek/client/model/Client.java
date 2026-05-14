@@ -63,6 +63,14 @@ public class Client {
     @Builder.Default
     private Boolean active = false;
 
+    // T4A-017 fix (spec C3 §6, C4 §31): klijenti su podeljeni na "moze da traduje"
+    // i "ne moze". Po default true radi backwards-compatibility — supervizor moze
+    // pojedinacno da revokuje preko `PATCH /clients/{id}/trading`.
+    @Column(name = "can_trade_stocks", nullable = false)
+    @org.hibernate.annotations.ColumnDefault("1")
+    @Builder.Default
+    private Boolean canTradeStocks = true;
+
     @Column(nullable = false, updatable = false)
     @org.hibernate.annotations.ColumnDefault("CURRENT_TIMESTAMP")
     @Builder.Default

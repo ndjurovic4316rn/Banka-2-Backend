@@ -117,6 +117,16 @@ public class ClientServiceImpl implements ClientService {
         return toResponse(client);
     }
 
+    @Override
+    @Transactional
+    public ClientResponseDto setTradingPermission(Long clientId, boolean canTrade) {
+        Client client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new RuntimeException("Klijent sa ID " + clientId + " nije pronadjen"));
+        client.setCanTradeStocks(canTrade);
+        client = clientRepository.save(client);
+        return toResponse(client);
+    }
+
     private ClientResponseDto toResponse(Client client) {
         return ClientResponseDto.builder()
                 .id(client.getId())
@@ -128,6 +138,7 @@ public class ClientServiceImpl implements ClientService {
                 .phone(client.getPhone())
                 .address(client.getAddress())
                 .active(client.getActive())
+                .canTradeStocks(client.getCanTradeStocks())
                 .createdAt(client.getCreatedAt())
                 .build();
     }

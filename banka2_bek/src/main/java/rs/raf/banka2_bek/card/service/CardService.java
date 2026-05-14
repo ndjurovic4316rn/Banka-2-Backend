@@ -16,4 +16,21 @@ public interface CardService {
     CardResponseDto unblockCard(Long cardId);
     CardResponseDto deactivateCard(Long cardId);
     CardResponseDto updateCardLimit(Long cardId, BigDecimal newLimit);
+
+    /**
+     * Dopuna INTERNET_PREPAID kartice — skida {@code amount} sa {@code sourceAccountId}
+     * i povecava {@code Card.prepaidBalance}. Obe operacije u jednoj transakciji.
+     * @throws IllegalStateException ako kartica nije INTERNET_PREPAID kategorije
+     * @throws IllegalArgumentException ako iznos nije pozitivan ili nema dovoljno na racunu
+     */
+    CardResponseDto topUpPrepaidCard(Long cardId, Long sourceAccountId, BigDecimal amount);
+
+    /**
+     * Povlacenje sredstava sa INTERNET_PREPAID kartice nazad na racun — obrnut smer od
+     * top-up-a. Skida {@code amount} sa {@code Card.prepaidBalance} i dodaje na
+     * {@code targetAccountId}. Atomicno u jednoj transakciji.
+     * @throws IllegalStateException ako kartica nije INTERNET_PREPAID kategorije
+     * @throws IllegalArgumentException ako iznos nije pozitivan ili nema dovoljno na kartici
+     */
+    CardResponseDto withdrawFromPrepaidCard(Long cardId, Long targetAccountId, BigDecimal amount);
 }

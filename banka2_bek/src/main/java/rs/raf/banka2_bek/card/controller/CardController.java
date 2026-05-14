@@ -93,6 +93,43 @@ public class CardController {
         return ResponseEntity.ok(cardService.updateCardLimit(id, request.getCardLimit()));
     }
 
+    /**
+     * Dopuna INTERNET_PREPAID kartice — prebacuje sredstva sa povezanog Account-a
+     * na Card.prepaidBalance. Klijent moze samo svoju karticu; employee/admin bilo koju.
+     */
+    @Operation(summary = "Top-up prepaid card", description = "Prebacuje iznos sa Account-a na Card.prepaidBalance (samo INTERNET_PREPAID).")
+    @PostMapping("/{id}/top-up")
+    public ResponseEntity<CardResponseDto> topUpPrepaidCard(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        Long sourceAccountId = body.get("sourceAccountId") != null
+                ? Long.valueOf(String.valueOf(body.get("sourceAccountId"))) : null;
+        if (sourceAccountId == null) {
+            throw new IllegalArgumentException("sourceAccountId je obavezan.");
+        }
+        BigDecimal amount = body.get("amount") != null
+                ? new BigDecimal(String.valueOf(body.get("amount"))) : null;
+        return ResponseEntity.ok(cardService.topUpPrepaidCard(id, sourceAccountId, amount));
+    }
+
+    /**
+     * Povlacenje sredstava sa INTERNET_PREPAID kartice nazad na Account.
+     */
+    @Operation(summary = "Withdraw from prepaid card", description = "Skida iznos sa Card.prepaidBalance i dodaje na ciljni Account.")
+    @PostMapping("/{id}/withdraw")
+    public ResponseEntity<CardResponseDto> withdrawFromPrepaidCard(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        Long targetAccountId = body.get("targetAccountId") != null
+                ? Long.valueOf(String.valueOf(body.get("targetAccountId"))) : null;
+        if (targetAccountId == null) {
+            throw new IllegalArgumentException("targetAccountId je obavezan.");
+        }
+        BigDecimal amount = body.get("amount") != null
+                ? new BigDecimal(String.valueOf(body.get("amount"))) : null;
+        return ResponseEntity.ok(cardService.withdrawFromPrepaidCard(id, targetAccountId, amount));
+    }
+
     // ===== Card Requests (klijent podnosi zahtev, admin odobrava) =====
 
     @PostMapping("/requests")

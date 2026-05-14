@@ -17,4 +17,10 @@ public interface ClientService {
     }
     ClientResponseDto getClientById(Long id);
     ClientResponseDto updateClient(Long id, UpdateClientRequestDto request);
+
+    /**
+     * T4A-017: supervizor menja `canTradeStocks` flag za klijenta. Spec C3 §6 / C4 §31
+     * trazi da samo klijenti sa permisijom mogu da trgovuju hartijama (Berza + OTC).
+     */
+    ClientResponseDto setTradingPermission(Long clientId, boolean canTrade);
 }

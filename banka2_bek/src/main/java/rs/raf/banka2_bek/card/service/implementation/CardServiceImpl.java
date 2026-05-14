@@ -13,6 +13,7 @@ import rs.raf.banka2_bek.account.repository.AccountRepository;
 import rs.raf.banka2_bek.card.dto.CardResponseDto;
 import rs.raf.banka2_bek.card.dto.CreateCardRequestDto;
 import rs.raf.banka2_bek.card.model.Card;
+import rs.raf.banka2_bek.card.model.CardCategory;
 import rs.raf.banka2_bek.card.model.CardStatus;
 import rs.raf.banka2_bek.card.model.CardType;
 import rs.raf.banka2_bek.card.repository.CardRepository;
@@ -59,7 +60,9 @@ public class CardServiceImpl implements CardService {
             checkCardLimit(account, client);
             BigDecimal limit = request.getCardLimit() != null ? request.getCardLimit() : BigDecimal.valueOf(100000);
             CardType cardType = request.getCardType() != null ? request.getCardType() : CardType.VISA;
-            return toResponse(createAndSaveCard(account, client, limit, cardType));
+            CardCategory cardCategory = request.getCardCategory() != null ? request.getCardCategory() : CardCategory.DEBIT;
+            BigDecimal creditLimit = request.getCreditLimit() != null ? request.getCreditLimit() : BigDecimal.ZERO;
+            return toResponse(createAndSaveCard(account, client, limit, cardType, cardCategory, creditLimit));
         }
 
         // Employee/Admin path: lookup account, resolve client from account
@@ -72,7 +75,9 @@ public class CardServiceImpl implements CardService {
         checkCardLimit(account, client);
         BigDecimal limit = request.getCardLimit() != null ? request.getCardLimit() : BigDecimal.valueOf(100000);
         CardType cardType = request.getCardType() != null ? request.getCardType() : CardType.VISA;
-        return toResponse(createAndSaveCard(account, client, limit, cardType));
+        CardCategory cardCategory = request.getCardCategory() != null ? request.getCardCategory() : CardCategory.DEBIT;
+        BigDecimal creditLimit = request.getCreditLimit() != null ? request.getCreditLimit() : BigDecimal.ZERO;
+        return toResponse(createAndSaveCard(account, client, limit, cardType, cardCategory, creditLimit));
     }
 
     @Override
@@ -246,6 +251,11 @@ public class CardServiceImpl implements CardService {
     }
 
     private Card createAndSaveCard(Account account, Client client, BigDecimal limit, CardType cardType) {
+        return createAndSaveCard(account, client, limit, cardType, CardCategory.DEBIT, BigDecimal.ZERO);
+    }
+
+    private Card createAndSaveCard(Account account, Client client, BigDecimal limit, CardType cardType,
+                                   CardCategory cardCategory, BigDecimal creditLimit) {
         String cardNumber;
         do {
             cardNumber = Card.generateCardNumber(cardType);
@@ -255,8 +265,13 @@ public class CardServiceImpl implements CardService {
 
         Card card = Card.builder()
                 .cardNumber(cardNumber)
-                .cardName(resolveCardName(cardType))
+                .cardName(resolveCardName(cardType, cardCategory))
                 .cardType(cardType)
+                .cardCategory(cardCategory != null ? cardCategory : CardCategory.DEBIT)
+                .creditLimit(cardCategory == CardCategory.CREDIT && creditLimit != null
+                        ? creditLimit : BigDecimal.ZERO)
+                .prepaidBalance(BigDecimal.ZERO)
+                .outstandingBalance(BigDecimal.ZERO)
                 .cvv(Card.generateCvv())
                 .account(account)
                 .client(client)
@@ -270,13 +285,29 @@ public class CardServiceImpl implements CardService {
         return cardRepository.save(card);
     }
 
-    private String resolveCardName(CardType cardType) {
-        return switch (cardType) {
-            case VISA -> "Visa Debit";
-            case MASTERCARD -> "MasterCard Debit";
-            case DINACARD -> "DinaCard Debit";
+    private String resolveCardName(CardType cardType, CardCategory cardCategory) {
+        String brand = switch (cardType) {
+            case VISA -> "Visa";
+            case MASTERCARD -> "MasterCard";
+            case DINACARD -> "DinaCard";
             case AMERICAN_EXPRESS -> "American Express";
         };
+        CardCategory cat = cardCategory != null ? cardCategory : CardCategory.DEBIT;
+        // American Express je historijski charge brend — ne dodajemo "Debit" suffix.
+        // Za CREDIT i INTERNET_PREPAID svi brendovi (ukljucujuci AMEX) dobijaju suffix.
+        if (cardType == CardType.AMERICAN_EXPRESS && cat == CardCategory.DEBIT) {
+            return brand;
+        }
+        String suffix = switch (cat) {
+            case DEBIT -> " Debit";
+            case CREDIT -> " Credit";
+            case INTERNET_PREPAID -> " Prepaid";
+        };
+        return brand + suffix;
+    }
+
+    private String resolveCardName(CardType cardType) {
+        return resolveCardName(cardType, CardCategory.DEBIT);
     }
 
     private CardResponseDto toResponse(Card card) {
@@ -286,10 +317,14 @@ public class CardServiceImpl implements CardService {
                 .cardName(card.getCardName())
                 .cvv(card.getCvv())
                 .cardType(card.getCardType())
+                .cardCategory(card.getCardCategory())
                 .accountId(card.getAccount().getId())
                 .accountNumber(card.getAccount().getAccountNumber())
                 .ownerName(card.getClient().getFirstName() + " " + card.getClient().getLastName())
                 .cardLimit(card.getCardLimit())
+                .prepaidBalance(card.getPrepaidBalance())
+                .creditLimit(card.getCreditLimit())
+                .outstandingBalance(card.getOutstandingBalance())
                 .status(card.getStatus())
                 .createdAt(card.getCreatedAt())
                 .expirationDate(card.getExpirationDate())
@@ -303,10 +338,14 @@ public class CardServiceImpl implements CardService {
                 .cardName(card.getCardName())
                 .cvv(null)
                 .cardType(card.getCardType())
+                .cardCategory(card.getCardCategory())
                 .accountId(card.getAccount().getId())
                 .accountNumber(card.getAccount().getAccountNumber())
                 .ownerName(card.getClient().getFirstName() + " " + card.getClient().getLastName())
                 .cardLimit(card.getCardLimit())
+                .prepaidBalance(card.getPrepaidBalance())
+                .creditLimit(card.getCreditLimit())
+                .outstandingBalance(card.getOutstandingBalance())
                 .status(card.getStatus())
                 .createdAt(card.getCreatedAt())
                 .expirationDate(card.getExpirationDate())
@@ -338,6 +377,88 @@ public class CardServiceImpl implements CardService {
             email = principal.toString();
         }
         return clientRepository.findByEmail(email).orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public CardResponseDto topUpPrepaidCard(Long cardId, Long sourceAccountId, BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("Iznos dopune mora biti veci od 0.");
+        }
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new RuntimeException("Kartica nije pronadjena"));
+        if (card.getCardCategory() != CardCategory.INTERNET_PREPAID) {
+            throw new IllegalStateException("Dopuna je dostupna samo za INTERNET_PREPAID kartice.");
+        }
+        if (card.getStatus() != CardStatus.ACTIVE) {
+            throw new IllegalStateException("Kartica nije aktivna — nije moguca dopuna.");
+        }
+
+        // CLIENT samo svoju karticu sme; EMPLOYEE/ADMIN moze za bilo koju.
+        if (!isCallerEmployeeOrAdmin()) {
+            Client client = getAuthenticatedClient();
+            if (card.getClient() == null || !card.getClient().getId().equals(client.getId())) {
+                throw new RuntimeException("Nemate pristup ovoj kartici");
+            }
+        }
+
+        Account sourceAccount = accountRepository.findById(sourceAccountId)
+                .orElseThrow(() -> new RuntimeException("Racun nije pronadjen"));
+        // Vlasnik racuna mora biti vlasnik kartice.
+        if (sourceAccount.getClient() == null
+                || !sourceAccount.getClient().getId().equals(card.getClient().getId())) {
+            throw new RuntimeException("Racun za dopunu mora pripadati vlasniku kartice.");
+        }
+        if (sourceAccount.getAvailableBalance() == null
+                || sourceAccount.getAvailableBalance().compareTo(amount) < 0) {
+            throw new IllegalArgumentException("Nedovoljno sredstava na racunu: potrebno " + amount);
+        }
+
+        sourceAccount.setBalance(sourceAccount.getBalance().subtract(amount));
+        sourceAccount.setAvailableBalance(sourceAccount.getAvailableBalance().subtract(amount));
+        accountRepository.save(sourceAccount);
+
+        card.setPrepaidBalance(card.getPrepaidBalance().add(amount));
+        return toResponse(cardRepository.save(card));
+    }
+
+    @Override
+    @Transactional
+    public CardResponseDto withdrawFromPrepaidCard(Long cardId, Long targetAccountId, BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("Iznos povlacenja mora biti veci od 0.");
+        }
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new RuntimeException("Kartica nije pronadjena"));
+        if (card.getCardCategory() != CardCategory.INTERNET_PREPAID) {
+            throw new IllegalStateException("Povlacenje je dostupno samo za INTERNET_PREPAID kartice.");
+        }
+        if (card.getPrepaidBalance() == null || card.getPrepaidBalance().compareTo(amount) < 0) {
+            throw new IllegalArgumentException("Nedovoljno sredstava na kartici: dostupno " + card.getPrepaidBalance());
+        }
+
+        if (!isCallerEmployeeOrAdmin()) {
+            Client client = getAuthenticatedClient();
+            if (card.getClient() == null || !card.getClient().getId().equals(client.getId())) {
+                throw new RuntimeException("Nemate pristup ovoj kartici");
+            }
+        }
+
+        Account targetAccount = accountRepository.findById(targetAccountId)
+                .orElseThrow(() -> new RuntimeException("Racun nije pronadjen"));
+        if (targetAccount.getClient() == null
+                || !targetAccount.getClient().getId().equals(card.getClient().getId())) {
+            throw new RuntimeException("Ciljni racun mora pripadati vlasniku kartice.");
+        }
+
+        card.setPrepaidBalance(card.getPrepaidBalance().subtract(amount));
+        cardRepository.save(card);
+
+        targetAccount.setBalance(targetAccount.getBalance().add(amount));
+        targetAccount.setAvailableBalance(targetAccount.getAvailableBalance().add(amount));
+        accountRepository.save(targetAccount);
+
+        return toResponse(card);
     }
 
     private void requireAuthenticated() {

@@ -80,6 +80,44 @@ public class Card {
     @Builder.Default
     private CardType cardType = CardType.VISA;
 
+    /**
+     * Kategorija kartice: DEBIT (direktan debit sa Account-a, default),
+     * CREDIT (sa kreditnim limitom i outstandingBalance), ili INTERNET_PREPAID
+     * (odvojen prepaidBalance koji se top-up-uje).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "card_category", nullable = false, length = 20)
+    @org.hibernate.annotations.ColumnDefault("'DEBIT'")
+    @Builder.Default
+    private CardCategory cardCategory = CardCategory.DEBIT;
+
+    /**
+     * Za INTERNET_PREPAID: tekuci balance na kartici (skidanje + top-up).
+     * Za DEBIT i CREDIT: uvek 0.
+     */
+    @Column(name = "prepaid_balance", precision = 19, scale = 4, nullable = false)
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Builder.Default
+    private BigDecimal prepaidBalance = BigDecimal.ZERO;
+
+    /**
+     * Za CREDIT: maksimalni iznos koji klijent moze da troši na rate.
+     * Za DEBIT i INTERNET_PREPAID: 0.
+     */
+    @Column(name = "credit_limit", precision = 19, scale = 4, nullable = false)
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Builder.Default
+    private BigDecimal creditLimit = BigDecimal.ZERO;
+
+    /**
+     * Za CREDIT: trenutno duguje banci. Otplata smanjuje, placanja povecavaju.
+     * Za DEBIT i INTERNET_PREPAID: 0.
+     */
+    @Column(name = "outstanding_balance", precision = 19, scale = 4, nullable = false)
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Builder.Default
+    private BigDecimal outstandingBalance = BigDecimal.ZERO;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 15)
     @org.hibernate.annotations.ColumnDefault("'ACTIVE'")

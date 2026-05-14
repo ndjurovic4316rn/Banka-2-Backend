@@ -2,6 +2,7 @@ package rs.raf.banka2_bek.card.dto;
 
 import lombok.Builder;
 import lombok.Data;
+import rs.raf.banka2_bek.card.model.CardCategory;
 import rs.raf.banka2_bek.card.model.CardStatus;
 import rs.raf.banka2_bek.card.model.CardType;
 
@@ -16,10 +17,18 @@ public class CardResponseDto {
     private String cardName;
     private String cvv;
     private CardType cardType;
+    /** Kategorija: DEBIT / CREDIT / INTERNET_PREPAID. */
+    private CardCategory cardCategory;
     private Long accountId;
     private String accountNumber;
     private String ownerName;
     private BigDecimal cardLimit;
+    /** Za INTERNET_PREPAID: tekuci balance. Za ostale: 0. */
+    private BigDecimal prepaidBalance;
+    /** Za CREDIT: maksimalni iznos koji klijent moze trositi. Za ostale: 0. */
+    private BigDecimal creditLimit;
+    /** Za CREDIT: trenutno duguje banci. Za ostale: 0. */
+    private BigDecimal outstandingBalance;
     private CardStatus status;
     private LocalDate createdAt;
     private LocalDate expirationDate;

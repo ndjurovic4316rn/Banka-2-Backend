@@ -503,6 +503,23 @@ VALUES
     ('4222001111222233', 'Visa Debit', '987', 11, 4,
      150000.0000, 'BLOCKED', '2026-01-01', '2030-01-01');
 
+-- Demo CREDIT kartica + INTERNET_PREPAID kartice (T4A nova: prosirenje tipova).
+-- Stefan: 1 CREDIT Mastercard + 1 INTERNET_PREPAID DinaCard (drugi slot 2 svog tekuceg racuna).
+-- Milica: 1 INTERNET_PREPAID na svom Euro racunu (account_id=6).
+INSERT INTO cards (card_number, card_name, cvv, account_id, client_id,
+                   card_limit, card_type, card_category, prepaid_balance, credit_limit, outstanding_balance,
+                   status, created_at, expiration_date, card_slot)
+VALUES
+    -- Stefan CREDIT MasterCard (account_id=1, slot=2 — drugi po redu kartica)
+    ('5212003333112299', 'MasterCard Credit', '111', 1, 1,
+     200000.0000, 'MASTERCARD', 'CREDIT', 0.0000, 500000.0000, 0.0000,
+     'ACTIVE', '2026-03-01', '2030-03-01', 2),
+
+    -- Milica INTERNET_PREPAID DinaCard (account_id=6, slot=1) — Euro
+    ('9891001122334455', 'DinaCard Prepaid', '222', 6, 2,
+     50000.0000, 'DINACARD', 'INTERNET_PREPAID', 1000.0000, 0.0000, 0.0000,
+     'ACTIVE', '2026-03-10', '2030-03-10', 1);
+
 
 -- ============================================================
 -- PAYMENT RECIPIENTS (sacuvani primaoci placanja)

@@ -18,5 +18,7 @@ public class ClientResponseDto {
     private String phone;
     private String address;
     private Boolean active;
+    /** T4A-017: ima li klijent permisiju za trgovinu hartijama (Berza + OTC). */
+    private Boolean canTradeStocks;
     private LocalDateTime createdAt;
 }
