@@ -560,9 +560,11 @@ public class OtcService {
         }
 
         if (from.getAvailableBalance().compareTo(fromAmount) < 0) {
+            // T4A-007: dodati ime vlasnika u poruku radi lakse orijentacije
+            String ownerName = resolveAccountOwnerName(from);
             throw new InsufficientFundsException(
                     "Nedovoljno sredstava na racunu " + from.getAccountNumber()
-                            + ": potrebno " + fromAmount + " " + fromCcy);
+                            + " (" + ownerName + "): potrebno " + fromAmount + " " + fromCcy);
         }
 
         from.setBalance(from.getBalance().subtract(fromAmount));
@@ -646,5 +648,16 @@ public class OtcService {
 
     private String resolveUserRole(Long userId) {
         return userResolver.resolveRole(userId);
+    }
+
+    private String resolveAccountOwnerName(Account account) {
+        if (account == null) return "nepoznat vlasnik";
+        if (account.getClient() != null) {
+            return account.getClient().getFirstName() + " " + account.getClient().getLastName();
+        }
+        if (account.getCompany() != null) {
+            return account.getCompany().getName();
+        }
+        return "Banka";
     }
 }
