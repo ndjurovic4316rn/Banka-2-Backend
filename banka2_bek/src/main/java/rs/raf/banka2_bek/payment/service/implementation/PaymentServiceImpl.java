@@ -5,6 +5,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,6 +18,16 @@ import rs.raf.banka2_bek.exchange.dto.CalculateExchangeResponseDto;
 import rs.raf.banka2_bek.account.model.Account;
 import rs.raf.banka2_bek.account.model.AccountStatus;
 import rs.raf.banka2_bek.account.repository.AccountRepository;
+import rs.raf.banka2_bek.interbank.protocol.Asset;
+import rs.raf.banka2_bek.interbank.protocol.CurrencyCode;
+import rs.raf.banka2_bek.interbank.protocol.MonetaryAsset;
+import rs.raf.banka2_bek.interbank.protocol.Posting;
+import rs.raf.banka2_bek.interbank.protocol.Transaction;
+import rs.raf.banka2_bek.interbank.protocol.TxAccount;
+import rs.raf.banka2_bek.interbank.repository.InterbankTransactionRepository;
+import rs.raf.banka2_bek.interbank.service.BankRoutingService;
+import rs.raf.banka2_bek.interbank.service.InterbankPaymentAsyncService;
+import rs.raf.banka2_bek.interbank.service.TransactionExecutorService;
 import rs.raf.banka2_bek.payment.dto.CreatePaymentRequestDto;
 import rs.raf.banka2_bek.payment.dto.PaymentDirection;
 import rs.raf.banka2_bek.payment.dto.PaymentListItemDto;
@@ -35,6 +47,7 @@ import rs.raf.banka2_bek.transaction.service.TransactionService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @lombok.extern.slf4j.Slf4j
@@ -49,6 +62,10 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentReceiptPdfGenerator paymentReceiptPdfGenerator;
     private final ExchangeService exchangeService;
     private final MailNotificationService mailNotificationService;
+    private final BankRoutingService bankRoutingService;
+    private final TransactionExecutorService transactionExecutorService;
+    private final InterbankPaymentAsyncService interbankPaymentAsyncService;
+    private final InterbankTransactionRepository interbankTransactionRepository;
     private final String bankRegistrationNumber;
     private static final int ORDER_NUMBER_MAX_RETRIES = 5;
     private static final BigDecimal COMMISSION_RATE = new BigDecimal("0.005"); // 0.5%
@@ -61,6 +78,10 @@ public class PaymentServiceImpl implements PaymentService {
                               PaymentReceiptPdfGenerator paymentReceiptPdfGenerator,
                               ExchangeService exchangeService,
                               MailNotificationService mailNotificationService,
+                              BankRoutingService bankRoutingService,
+                              TransactionExecutorService transactionExecutorService,
+                              InterbankPaymentAsyncService interbankPaymentAsyncService,
+                              InterbankTransactionRepository interbankTransactionRepository,
                               @Value("${bank.registration-number}") String bankRegistrationNumber) {
         this.paymentRepository = paymentRepository;
         this.paymentAccountRepository = paymentAccountRepository;
@@ -70,6 +91,10 @@ public class PaymentServiceImpl implements PaymentService {
         this.paymentReceiptPdfGenerator = paymentReceiptPdfGenerator;
         this.exchangeService = exchangeService;
         this.mailNotificationService = mailNotificationService;
+        this.bankRoutingService = bankRoutingService;
+        this.transactionExecutorService = transactionExecutorService;
+        this.interbankPaymentAsyncService = interbankPaymentAsyncService;
+        this.interbankTransactionRepository = interbankTransactionRepository;
         this.bankRegistrationNumber = bankRegistrationNumber;
     }
 
@@ -85,27 +110,38 @@ public class PaymentServiceImpl implements PaymentService {
      * 7. Dodaj AMOUNT primaocu
      * 8. Dodaj AMOUNT + PROVIZIJA banci (za cross-currency) ili samo PROVIZIJU (za same-currency)
      * 9. Sacuvaj payment, kreiraj transakcije, posalji email
+     *
+     * Za medjubankarska placanja (toAccount prefix != nas routing number):
+     * koraci 1 i 3 se rade lokalno, a prenos se delegira TransactionExecutorService
+     * (2PC protokol §2.8) koji radi asinhrono.
      */
     @Override
     @Transactional
     public PaymentResponseDto createPayment(CreatePaymentRequestDto request) {
-        // ===== 1. VALIDACIJA =====
+        // ===== VALIDACIJA posiljaoca (zajednicki za oba flow-a) =====
         Account fromAccount = paymentAccountRepository.findForUpdateByAccountNumber(request.getFromAccount())
                 .orElseThrow(() -> new IllegalArgumentException("Racun posiljaoca ne postoji."));
 
-        Account toAccount = paymentAccountRepository.findForUpdateByAccountNumber(request.getToAccount())
-                .orElseThrow(() -> new IllegalArgumentException("Racun primaoca ne postoji."));
-
         if (fromAccount.getStatus() != AccountStatus.ACTIVE)
             throw new IllegalArgumentException("Racun posiljaoca nije aktivan.");
-        if (toAccount.getStatus() != AccountStatus.ACTIVE)
-            throw new IllegalArgumentException("Racun primaoca nije aktivan.");
-        if (fromAccount.getId().equals(toAccount.getId()))
-            throw new IllegalArgumentException("Racuni moraju biti razliciti.");
 
         Client client = getAuthenticatedClient();
         if (fromAccount.getClient() == null || !fromAccount.getClient().getId().equals(client.getId()))
             throw new IllegalArgumentException("Racun ne pripada klijentu.");
+
+        // ===== FORK: medjubankarsko vs lokalno =====
+        if (!bankRoutingService.isLocalAccount(request.getToAccount())) {
+            return createInterbankPayment(request, client, fromAccount);
+        }
+
+        // ===== LOKALNI FLOW (nepromenjeno) =====
+        Account toAccount = paymentAccountRepository.findForUpdateByAccountNumber(request.getToAccount())
+                .orElseThrow(() -> new IllegalArgumentException("Racun primaoca ne postoji."));
+
+        if (toAccount.getStatus() != AccountStatus.ACTIVE)
+            throw new IllegalArgumentException("Racun primaoca nije aktivan.");
+        if (fromAccount.getId().equals(toAccount.getId()))
+            throw new IllegalArgumentException("Racuni moraju biti razliciti.");
 
         // ===== 2. PROVIZIJA =====
         BigDecimal amount = request.getAmount();
@@ -213,7 +249,102 @@ public class PaymentServiceImpl implements PaymentService {
             log.warn("Failed to send payment confirmation email: {}", e.getMessage());
         }
 
-        return toResponse(savedPayment, client.getId());
+        return toResponse(savedPayment, client.getId(), null);
+    }
+
+    /**
+     * Interbank payment via 2PC protocol (§2.8).
+     *
+     * Saves a PROCESSING payment record immediately, then registers an after-commit
+     * hook that triggers the async 2PC on the interbank thread pool. The caller
+     * (createPayment) is already inside @Transactional, so the Payment row is
+     * committed before executeAsync runs.
+     */
+    private PaymentResponseDto createInterbankPayment(CreatePaymentRequestDto request,
+                                                       Client client,
+                                                       Account fromAccount) {
+        BigDecimal amount = request.getAmount();
+
+        // ===== LIMITI (posiljalac) =====
+        if (fromAccount.getDailyLimit() != null && fromAccount.getDailyLimit().compareTo(BigDecimal.ZERO) > 0
+                && fromAccount.getDailySpending().add(amount).compareTo(fromAccount.getDailyLimit()) > 0)
+            throw new IllegalArgumentException("Prekoracen dnevni limit.");
+        if (fromAccount.getMonthlyLimit() != null && fromAccount.getMonthlyLimit().compareTo(BigDecimal.ZERO) > 0
+                && fromAccount.getMonthlySpending().add(amount).compareTo(fromAccount.getMonthlyLimit()) > 0)
+            throw new IllegalArgumentException("Prekoracen mesecni limit.");
+
+        String currencyCode = fromAccount.getCurrency() != null
+                ? fromAccount.getCurrency().getCode()
+                : "RSD";
+        CurrencyCode ccy;
+        try {
+            ccy = CurrencyCode.valueOf(currencyCode);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Valuta racuna nije podrzana u medjubankarskom protokolu: " + currencyCode);
+        }
+
+        Asset monetaryAsset = new Asset.Monas(new MonetaryAsset(ccy));
+
+        // Build balanced postings: sender (negative = credit) + receiver (positive = debit)
+        List<Posting> postings = List.of(
+                new Posting(new TxAccount.Account(fromAccount.getAccountNumber()), amount.negate(), monetaryAsset),
+                new Posting(new TxAccount.Account(request.getToAccount()), amount, monetaryAsset)
+        );
+
+        Transaction tx = transactionExecutorService.formTransaction(
+                postings,
+                request.getDescription(),
+                request.getReferenceNumber(),
+                request.getPaymentCode().getCode(),
+                request.getDescription()
+        );
+
+        String paymentCode = request.getPaymentCode().getCode();
+        Payment payment = Payment.builder()
+                .fromAccount(fromAccount)
+                .toAccountNumber(request.getToAccount())
+                .amount(amount)
+                .fee(BigDecimal.ZERO)
+                .currency(fromAccount.getCurrency())
+                .recipientName(request.getRecipientName())
+                .paymentCode(paymentCode)
+                .referenceNumber(request.getReferenceNumber())
+                .purpose(request.getDescription())
+                .status(PaymentStatus.PROCESSING)
+                .createdBy(client)
+                .interbankTxIdString(tx.transactionId().id())
+                .interbankTxRoutingNumber(tx.transactionId().routingNumber())
+                .build();
+
+        Payment savedPayment = null;
+        for (int attempt = 1; attempt <= ORDER_NUMBER_MAX_RETRIES; attempt++) {
+            try {
+                payment.setOrderNumber(generateOrderNumber());
+                savedPayment = paymentRepository.saveAndFlush(payment);
+                break;
+            } catch (DataIntegrityViolationException ex) {
+                String msg = ex.getMostSpecificCause().getMessage();
+                if (msg == null) throw ex;
+                String lower = msg.toLowerCase();
+                if (!(lower.contains("order_number") || lower.contains("uk") || lower.contains("unique")))
+                    throw ex;
+            }
+        }
+        if (savedPayment == null)
+            throw new IllegalStateException("Generisanje broja placanja nije uspelo.");
+
+        final Long paymentId = savedPayment.getId();
+        final Transaction txFinal = tx;
+
+        // Fire 2PC after this @Transactional commits so the Payment row is visible
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                interbankPaymentAsyncService.executeAsync(paymentId, txFinal);
+            }
+        });
+
+        return toResponse(savedPayment, client.getId(), "PREPARING");
     }
 
     @Override
@@ -230,7 +361,17 @@ public class PaymentServiceImpl implements PaymentService {
         Client client = getAuthenticatedClient();
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new IllegalArgumentException("Placanje nije pronadjeno."));
-        return toResponse(payment, client.getId());
+
+        String sagaPhase = null;
+        if (payment.getInterbankTxIdString() != null && payment.getInterbankTxRoutingNumber() != null) {
+            sagaPhase = interbankTransactionRepository
+                    .findByTransactionRoutingNumberAndTransactionIdString(
+                            payment.getInterbankTxRoutingNumber(), payment.getInterbankTxIdString())
+                    .map(ibTx -> ibTx.getStatus().name())
+                    .orElse(null);
+        }
+
+        return toResponse(payment, client.getId(), sagaPhase);
     }
 
     @Override
@@ -248,7 +389,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     // ===== MAPPERS =====
 
-    private PaymentResponseDto toResponse(Payment p, Long clientId) {
+    private PaymentResponseDto toResponse(Payment p, Long clientId, String sagaPhase) {
         return PaymentResponseDto.builder()
                 .id(p.getId()).orderNumber(p.getOrderNumber())
                 .fromAccount(p.getFromAccount() != null ? p.getFromAccount().getAccountNumber() : null)
@@ -256,7 +397,8 @@ public class PaymentServiceImpl implements PaymentService {
                 .currency(p.getCurrency() != null ? p.getCurrency().getCode() : null)
                 .paymentCode(p.getPaymentCode()).referenceNumber(p.getReferenceNumber())
                 .description(p.getPurpose()).recipientName(p.getRecipientName())
-                .direction(resolveDirection(p, clientId)).status(p.getStatus()).createdAt(p.getCreatedAt())
+                .direction(resolveDirection(p, clientId)).status(p.getStatus())
+                .createdAt(p.getCreatedAt()).sagaPhase(sagaPhase)
                 .build();
     }
 

@@ -46,6 +46,19 @@ public class AssistantConfig {
         return executor;
     }
 
+    @Bean(name = "interbankTaskExecutor")
+    public TaskExecutor interbankTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("interbank-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        executor.initialize();
+        return executor;
+    }
+
     @Bean(name = "assistantObjectMapper")
     public ObjectMapper assistantObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
