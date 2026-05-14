@@ -309,7 +309,6 @@ class PaymentServiceImplTest {
     void createPayment_throwsWhenFromAccountInactive() {
         fromAccount.setStatus(AccountStatus.INACTIVE);
         when(paymentAccountRepository.findForUpdateByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
-        when(paymentAccountRepository.findForUpdateByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
 
         assertThatThrownBy(() -> paymentService.createPayment(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -345,7 +344,6 @@ class PaymentServiceImplTest {
         fromAccount.setClient(other);
 
         when(paymentAccountRepository.findForUpdateByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
-        when(paymentAccountRepository.findForUpdateByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
 
         assertThatThrownBy(() -> paymentService.createPayment(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -438,7 +436,6 @@ class PaymentServiceImplTest {
         SecurityContextHolder.clearContext();
 
         when(paymentAccountRepository.findForUpdateByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
-        when(paymentAccountRepository.findForUpdateByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
 
         assertThatThrownBy(() -> paymentService.createPayment(request))
                 .isInstanceOf(IllegalArgumentException.class);

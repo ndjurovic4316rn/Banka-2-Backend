@@ -669,7 +669,6 @@ class PaymentServiceImplExtendedTest {
             fromAccount.setStatus(AccountStatus.BLOCKED);
             CreatePaymentRequestDto request = buildRequest("100.00");
             when(paymentAccountRepository.findForUpdateByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
-            when(paymentAccountRepository.findForUpdateByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
 
             assertThatThrownBy(() -> paymentService.createPayment(request))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -708,7 +707,6 @@ class PaymentServiceImplExtendedTest {
             fromAccount.setClient(null);
             CreatePaymentRequestDto request = buildRequest("100.00");
             when(paymentAccountRepository.findForUpdateByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
-            when(paymentAccountRepository.findForUpdateByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
 
             assertThatThrownBy(() -> paymentService.createPayment(request))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -723,7 +721,6 @@ class PaymentServiceImplExtendedTest {
             fromAccount.setClient(other);
             CreatePaymentRequestDto request = buildRequest("100.00");
             when(paymentAccountRepository.findForUpdateByAccountNumber(request.getFromAccount())).thenReturn(Optional.of(fromAccount));
-            when(paymentAccountRepository.findForUpdateByAccountNumber(request.getToAccount())).thenReturn(Optional.of(toAccount));
 
             assertThatThrownBy(() -> paymentService.createPayment(request))
                     .isInstanceOf(IllegalArgumentException.class)
