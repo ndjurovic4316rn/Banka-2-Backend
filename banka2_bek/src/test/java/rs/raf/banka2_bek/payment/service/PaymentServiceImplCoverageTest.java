@@ -78,6 +78,7 @@ class PaymentServiceImplCoverageTest {
                 bankRoutingService, transactionExecutorService,
                 interbankPaymentAsyncService, interbankTransactionRepository,
                 "22200022");
+        when(bankRoutingService.isLocalAccount(any())).thenReturn(true);
     }
 
     @AfterEach

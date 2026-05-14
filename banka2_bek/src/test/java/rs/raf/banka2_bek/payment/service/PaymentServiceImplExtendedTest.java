@@ -90,6 +90,8 @@ class PaymentServiceImplExtendedTest {
                 interbankPaymentAsyncService, interbankTransactionRepository,
                 "22200022");
 
+        when(bankRoutingService.isLocalAccount(any())).thenReturn(true);
+
         client = new Client();
         client.setId(10L);
         client.setEmail("client@test.com");

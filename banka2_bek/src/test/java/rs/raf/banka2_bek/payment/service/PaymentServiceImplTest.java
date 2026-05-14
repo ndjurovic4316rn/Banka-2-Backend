@@ -95,6 +95,8 @@ class PaymentServiceImplTest {
                 interbankPaymentAsyncService, interbankTransactionRepository,
                 "22200022");
 
+        when(bankRoutingService.isLocalAccount(any())).thenReturn(true);
+
         request = new CreatePaymentRequestDto();
         request.setFromAccount("111111111111111111");
         request.setToAccount("222222222222222222");
