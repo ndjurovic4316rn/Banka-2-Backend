@@ -42,6 +42,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -78,7 +79,7 @@ class PaymentServiceImplCoverageTest {
                 bankRoutingService, transactionExecutorService,
                 interbankPaymentAsyncService, interbankTransactionRepository,
                 "22200022");
-        when(bankRoutingService.isLocalAccount(any())).thenReturn(true);
+        lenient().when(bankRoutingService.isLocalAccount(any())).thenReturn(true);
     }
 
     @AfterEach
